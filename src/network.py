@@ -1,8 +1,14 @@
 """
 Network module — fetches pedestrian walk networks from OpenStreetMap.
 
-Uses OSMnx to query the Overpass API. All functions are parameterized
+Uses OSMnx 2.x to query the Overpass API. All functions are parameterized
 by place name or bounding box — zero hardcoded coordinates.
+
+OSMnx 2.x API notes:
+  - graph_from_bbox() takes a single bbox tuple: (west, south, east, north)
+    i.e., (min_lon, min_lat, max_lon, max_lat)
+  - Edge lengths are auto-calculated during graph creation
+  - add_edge_lengths() is no longer needed
 """
 import osmnx as ox
 
@@ -25,8 +31,6 @@ def fetch_walk_network(place_query: str):
         network_type="walk",
         simplify=True,
     )
-    # Ensure all edges have geometry (not just start/end nodes)
-    graph = ox.add_edge_lengths(graph)
     return graph
 
 
@@ -35,20 +39,19 @@ def fetch_walk_network_bbox(bbox: tuple):
     Fetch the pedestrian walk network for a bounding box.
 
     Args:
-        bbox: (min_lon, min_lat, max_lon, max_lat)
+        bbox: (min_lon, min_lat, max_lon, max_lat) — same as (west, south, east, north)
 
     Returns:
         networkx.MultiDiGraph: The walk network graph.
     """
-    min_lon, min_lat, max_lon, max_lat = bbox
-    # OSMnx uses (north, south, east, west) ordering
+    # OSMnx 2.x takes bbox as a single tuple: (west, south, east, north)
+    # Our convention: (min_lon, min_lat, max_lon, max_lat)
+    # These are the same order, so pass directly.
     graph = ox.graph_from_bbox(
-        north=max_lat, south=min_lat,
-        east=max_lon, west=min_lon,
+        bbox=bbox,
         network_type="walk",
         simplify=True,
     )
-    graph = ox.add_edge_lengths(graph)
     return graph
 
 

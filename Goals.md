@@ -103,4 +103,8 @@ The predecessor **worked for Gainesville, FL.** It had a polished frontend and p
 | Date | Change | Commit |
 |------|--------|--------|
 | 2026-06-18 | Initial Goals.md — project bootstrapped | `0a14eab` |
-| 2026-06-18 | Corrected anti-goals based on actual predecessor failure mode (faked backend, not overplanning) | — |
+| 2026-06-18 | Corrected anti-goals based on actual predecessor failure mode (faked backend, not overplanning) | `b3a1d2f` |
+| 2026-06-18 | TDD test suite: 5 test files (network, noise, canopy, scoring, integration) with random city selection from top 100 US cities | `87ab10c` |
+| 2026-06-18 | Source modules: network, noise, canopy, scoring, pipeline — all city-agnostic, real API data | `87ab10c` |
+| 2026-06-18 | FastAPI server, Leaflet frontend, GitHub Actions CI (tests run in cloud since work PC blocks Python) | — |
+
