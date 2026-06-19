@@ -1,0 +1,21 @@
+# HCF — Human Comfort Factors
+# Python dependencies
+
+# Geospatial processing
+osmnx
+geopandas
+shapely
+
+# Web API
+fastapi
+uvicorn
+requests
+
+# Data/analysis
+pydantic
+
+# Testing
+pytest
+
+# Optional: raster reading for canopy fallback
+# rasterio  # Uncomment if GDAL is available on your system
