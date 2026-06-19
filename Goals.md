@@ -38,26 +38,28 @@ Comfort Score = 100 - [(wH × Heat_Penalty) + (wN × Noise_Penalty) + (wS × Sha
 
 ## Technical Constraints
 
-1. **No proprietary hardware or sensors.** All data from existing public APIs and open datasets. *(Lesson from predecessor: IoT sensors created regulatory/scaling nightmares.)*
+1. **No proprietary hardware or sensors.** All data from existing public APIs and open datasets. *(Lesson from predecessor v1: IoT sensors created regulatory/scaling nightmares.)*
 2. **Python backend** for geospatial processing (OSMnx, GeoPandas). These are the only viable tools short of a full GIS server.
 3. **Lightweight browser frontend.** Keep it simple — Leaflet or similar. No GPU-rendering frameworks unless proven necessary.
 4. **Validate data sources before building on them.** Every API gets a throwaway test script before any architecture depends on it.
 5. **Vertical slices over horizontal layers.** Each phase delivers a working, demoable increment — not "all backend, then all frontend."
+6. **Multi-city validation from day one.** Every backend feature must be tested against at least 2 different US cities before it's considered done. No city-specific assumptions in the pipeline. *(Lesson from predecessor v2: see Anti-Goals #1.)*
 
 ---
 
 ## Phased Scope
 
 ### Phase 1 — Vertical Slice (MVP)
-> Goal: Colored lines on a map from real data.
+> Goal: Colored lines on a map from real data, proven across multiple cities.
 
 - [ ] Validate that `osmnx` + `geopandas` install and run on the dev environment
-- [ ] Validate at least one environmental data source API (noise or heat) returns usable street-level data
-- [ ] Backend: Fetch pedestrian network for a given US city via OSMnx
+- [ ] Validate at least one environmental data source API (noise or heat) returns usable street-level data for multiple US cities
+- [ ] Backend: Fetch pedestrian network for a given US city via OSMnx (city-agnostic — no hardcoded coordinates)
 - [ ] Backend: Fetch environmental data and spatial-join to street segments
 - [ ] Backend: Compute comfort score per segment
 - [ ] Frontend: Render scored segments as colored lines on an interactive map
 - [ ] End-to-end: User types a city name → sees scored map
+- [ ] **Scalability gate: Verify end-to-end works for at least 3 different cities before moving to Phase 2**
 
 ### Phase 2 — Multi-Factor & Polish
 > Goal: Multiple data layers, user controls, production-ready.
@@ -80,13 +82,19 @@ Comfort Score = 100 - [(wH × Heat_Penalty) + (wN × Noise_Penalty) + (wS × Sha
 
 ## Anti-Goals (Lessons from Predecessor)
 
-These are things we will **not** do:
+The predecessor project (archived in `/archive`) had two iterations. Both failed for different reasons. These anti-goals encode the real lessons.
 
-1. **No multi-document planning frameworks.** One Goals.md, updated as we go. No separate PRD, architecture doc, deep-dive, and backlog that contradict each other.
-2. **No architecture astronautics.** No adapter patterns, tiered data models, or provider abstractions until the MVP works end-to-end.
-3. **No untested data source assumptions.** If we can't hit an API and get usable data back in a test script, it doesn't go in the architecture.
-4. **No frontend framework overhead.** Start with vanilla HTML + JS + Leaflet. Upgrade only when there's a proven need.
-5. **No deployment planning before local works.** Docker, AWS, S3 are Phase 3 concerns at the earliest.
+### What actually killed it
+
+The predecessor **worked for Gainesville, FL.** It had a polished frontend and produced convincing results — for that one city. But the backend was faking too much of the computation: hardcoded data, city-specific assumptions, mock values where real data pipelines should have been. When we tried to point it at a different city, the entire foundation collapsed. By the time we realized the backend couldn't generalize, too much had been built on top of it to salvage.
+
+### Rules to prevent repeating it
+
+1. **No faking the hard parts.** The backend computation pipeline must use real data, real spatial joins, and real scoring from day one. No mock data, no hardcoded coordinates, no city-specific shortcuts that look right for one place but break everywhere else. If a data source isn't ready, the feature waits — we don't stub it with fake numbers and move on.
+2. **Backend before polish.** The previous project had a great frontend on top of a hollow backend. This time: get the computation pipeline working and generalizing *first*. The frontend can be ugly until the engine is proven.
+3. **Test with multiple cities immediately.** Every feature gets validated against at least 2-3 different US cities (varying size, region, data availability) before it's marked complete. A feature that only works for one city is a bug, not a feature.
+4. **No city-specific assumptions in the pipeline.** The data fetching, spatial joining, and scoring must be purely parameterized by city name or bounding box. Zero hardcoded lat/lon, zero city-name conditionals, zero locally cached datasets for one specific place.
+5. **Validate the geospatial stack early.** `osmnx` and `geopandas` have notoriously difficult Windows installs (GDAL/GEOS C dependencies). Confirm these actually run on the dev machine before building anything on top of them.
 
 ---
 
@@ -94,4 +102,5 @@ These are things we will **not** do:
 
 | Date | Change | Commit |
 |------|--------|--------|
-| 2026-06-18 | Initial Goals.md — project bootstrapped | *(initial commit)* |
+| 2026-06-18 | Initial Goals.md — project bootstrapped | `0a14eab` |
+| 2026-06-18 | Corrected anti-goals based on actual predecessor failure mode (faked backend, not overplanning) | — |
