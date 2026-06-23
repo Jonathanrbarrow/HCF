@@ -357,7 +357,7 @@
                             <div style="font-size: 12px; color: #666; margin-bottom: 8px;">${label}</div>
                             <div style="font-size: 13px;">
                                 ${p.noise_dba !== null ? `🔊 Noise: ${p.noise_dba.toFixed(1)} dBA<br>` : ''}
-                                ${p.canopy_pct !== null ? `🌳 Canopy: ${p.canopy_pct.toFixed(0)}%` : ''}
+                                ${p.canopy_height_m !== null ? `🌳 Canopy: ${p.canopy_height_m.toFixed(1)}m (${p.canopy_pct.toFixed(0)}% shade)` : ''}
                             </div>
                         </div>
                     `);

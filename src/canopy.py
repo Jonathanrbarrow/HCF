@@ -1,163 +1,212 @@
 """
-Canopy module — fetches tree canopy cover data from the MRLC/USGS
-National Land Cover Database via OGC WMS service.
+Canopy module — fetches tree canopy HEIGHT data from the Meta/WRI
+Global Canopy Height Map via Cloud Optimized GeoTIFFs on AWS S3.
 
 Data source:
-  MRLC NLCD Tree Canopy Cover (USDA Forest Service)
-  Available via WMS at https://www.mrlc.gov/geoserver/mrlc_display/wms
+  Meta & World Resources Institute (WRI) Global Canopy Height Map
+  S3: s3://dataforgood-fb-data/forests/v1/alsgedi_global_v6_float/chm/
+  Format: Cloud Optimized GeoTIFF (COG), QuadKey-named tiles
+  Resolution: 1 meter
+  Values: Canopy height in meters (0 = no canopy)
+  Coverage: Global
+  No authentication required (anonymous S3 access)
 
-The tree canopy cover product provides 30m resolution percentage
-canopy cover (0-100%) across the continental US.
+Why canopy HEIGHT instead of canopy cover %:
+  - 1m resolution vs 30m (NLCD) — can distinguish individual trees from bare sidewalk
+  - Height is a better shade proxy — a 20m oak provides far more shade than a 3m shrub
+  - Global coverage — not limited to CONUS
 
-No authentication required.
+QuadKey tile system:
+  The dataset uses Bing Maps QuadKey tiling. We compute the QuadKey
+  directly from lat/lon using the standard algorithm, no index file needed.
 """
-import requests
 import math
-import struct
-from io import BytesIO
+import os
+import requests
 
-# MRLC WMS endpoint for NLCD products
-MRLC_WMS_URL = "https://www.mrlc.gov/geoserver/mrlc_display/wms"
+# We try rasterio first (for direct COG reads from S3).
+# If not available, fall back to HTTP range requests.
+try:
+    import rasterio
+    from rasterio.session import AWSSession
+    from rasterio.windows import Window
+    HAS_RASTERIO = True
+except ImportError:
+    HAS_RASTERIO = False
 
-# The tree canopy cover layer name
-CANOPY_LAYER = "NLCD_2021_Tree_Canopy_L48"
+# S3 base path for the Meta/WRI canopy height tiles
+S3_BUCKET = "dataforgood-fb-data"
+S3_PREFIX = "forests/v1/alsgedi_global_v6_float/chm"
+S3_HTTP_BASE = f"https://{S3_BUCKET}.s3.amazonaws.com/{S3_PREFIX}"
 
+# QuadKey zoom level used by the dataset
+# Tiles are named with 9-digit QuadKeys (zoom level 9)
+# Each tile covers roughly 0.7° × 0.7° at mid-latitudes
+TILE_ZOOM = 9
+
+
+# ── QuadKey Computation ──────────────────────────────────────────────
+
+def _latlon_to_quadkey(lat: float, lon: float, zoom: int = TILE_ZOOM) -> str:
+    """
+    Convert lat/lon to a Bing Maps QuadKey at the given zoom level.
+
+    Uses the standard Web Mercator tile pyramid:
+      lat/lon → pixel XY → tile XY → QuadKey
+
+    Args:
+        lat: Latitude in decimal degrees (-85.05 to 85.05)
+        lon: Longitude in decimal degrees (-180 to 180)
+        zoom: Tile zoom level
+
+    Returns:
+        str: QuadKey string (e.g. "021301332")
+    """
+    lat = max(min(lat, 85.05112878), -85.05112878)
+    lon = max(min(lon, 180.0), -180.0)
+
+    sin_lat = math.sin(lat * math.pi / 180.0)
+    n = 2.0 ** zoom
+
+    pixel_x = ((lon + 180.0) / 360.0) * 256 * n
+    pixel_y = (0.5 - math.log((1 + sin_lat) / (1 - sin_lat)) / (4 * math.pi)) * 256 * n
+
+    tile_x = int(pixel_x // 256)
+    tile_y = int(pixel_y // 256)
+
+    # Clamp to valid range
+    tile_x = max(0, min(tile_x, int(n) - 1))
+    tile_y = max(0, min(tile_y, int(n) - 1))
+
+    quadkey = ""
+    for i in range(zoom, 0, -1):
+        digit = 0
+        mask = 1 << (i - 1)
+        if (tile_x & mask) != 0:
+            digit += 1
+        if (tile_y & mask) != 0:
+            digit += 2
+        quadkey += str(digit)
+
+    return quadkey
+
+
+def _get_tile_url(quadkey: str) -> str:
+    """Return the HTTPS URL for a canopy height tile by QuadKey."""
+    return f"{S3_HTTP_BASE}/{quadkey}.tif"
+
+
+def _get_tile_s3_path(quadkey: str) -> str:
+    """Return the S3 URI for a canopy height tile by QuadKey."""
+    return f"s3://{S3_BUCKET}/{S3_PREFIX}/{quadkey}.tif"
+
+
+# ── Data Fetching ────────────────────────────────────────────────────
 
 def fetch_canopy_at_point(lat: float, lon: float) -> float | None:
     """
-    Fetch tree canopy cover percentage at a specific lat/lon.
+    Fetch tree canopy height (meters) at a specific lat/lon.
 
-    Uses WMS GetFeatureInfo to query the canopy raster at a point.
+    Strategy:
+    1. Compute the QuadKey for the given coordinates
+    2. Open the corresponding COG tile from S3
+    3. Read the single pixel at the point's location
 
     Args:
         lat: Latitude (decimal degrees)
         lon: Longitude (decimal degrees)
 
     Returns:
-        float: Canopy cover percentage (0-100), or None if no data.
+        float: Canopy height in meters (0 = no trees), or None if no data.
     """
-    # Build a small bbox around the point (1 pixel at ~30m)
-    offset = 0.001  # ~111m, enough for a small WMS window
-    bbox = f"{lon - offset},{lat - offset},{lon + offset},{lat + offset}"
+    quadkey = _latlon_to_quadkey(lat, lon)
 
-    params = {
-        "service": "WMS",
-        "version": "1.1.1",
-        "request": "GetFeatureInfo",
-        "layers": CANOPY_LAYER,
-        "query_layers": CANOPY_LAYER,
-        "info_format": "application/json",
-        "srs": "EPSG:4326",
-        "bbox": bbox,
-        "width": 3,
-        "height": 3,
-        "x": 1,  # center pixel
-        "y": 1,
-        "feature_count": 1,
-    }
+    if HAS_RASTERIO:
+        return _fetch_via_rasterio(lat, lon, quadkey)
+    else:
+        return _fetch_via_http(lat, lon, quadkey)
+
+
+def _fetch_via_rasterio(lat: float, lon: float, quadkey: str) -> float | None:
+    """Read a single pixel from the COG using rasterio (efficient)."""
+    tile_url = _get_tile_s3_path(quadkey)
 
     try:
-        resp = requests.get(MRLC_WMS_URL, params=params, timeout=20)
-        resp.raise_for_status()
-        data = resp.json()
+        env_kwargs = {}
+        # Configure anonymous S3 access
+        import boto3
+        from botocore import UNSIGNED
+        from botocore.config import Config as BotoConfig
+        session = boto3.Session()
+        aws_session = AWSSession(session, aws_unsigned=True)
+        env_kwargs["session"] = aws_session
+    except ImportError:
+        # Fall back to HTTPS if boto3 is not available
+        tile_url = _get_tile_url(quadkey)
+        env_kwargs = {}
 
-        features = data.get("features", [])
-        if not features:
-            return None
+    try:
+        with rasterio.Env(**env_kwargs):
+            with rasterio.open(tile_url) as src:
+                # Transform lat/lon to the raster's CRS pixel coordinates
+                row, col = src.index(lon, lat)
 
-        props = features[0].get("properties", {})
-        # Try common field names for the raster value
-        for key in ["GRAY_INDEX", "Gray_Index", "gray_index", "value", "Value",
-                     "PIXEL_VALUE", "pixel_value", "Band1"]:
-            if key in props:
-                try:
-                    val = float(props[key])
-                    if val >= 0:
-                        return min(val, 100.0)  # Clamp to valid range
-                except (ValueError, TypeError):
-                    continue
+                # Bounds check
+                if row < 0 or row >= src.height or col < 0 or col >= src.width:
+                    return None
 
-        # Try first numeric value in properties
-        for key, val in props.items():
-            try:
-                fval = float(val)
-                if 0 <= fval <= 100:
-                    return fval
-            except (ValueError, TypeError):
-                continue
+                # Windowed read — only fetches the needed COG block
+                window = Window(col, row, 1, 1)
+                data = src.read(1, window=window)
+                value = float(data[0, 0])
 
-        return None
+                # NoData handling
+                if src.nodata is not None and value == src.nodata:
+                    return None
+                if value < 0:
+                    return None
+
+                return value
 
     except Exception:
-        # Fallback: try GetMap and read the pixel value directly
-        return _fetch_canopy_via_getmap(lat, lon)
-
-
-def _fetch_canopy_via_getmap(lat: float, lon: float) -> float | None:
-    """
-    Fallback: Fetch canopy by getting a tiny raster image and reading
-    the center pixel value directly.
-    """
-    offset = 0.0005
-    bbox = f"{lon - offset},{lat - offset},{lon + offset},{lat + offset}"
-
-    params = {
-        "service": "WMS",
-        "version": "1.1.1",
-        "request": "GetMap",
-        "layers": CANOPY_LAYER,
-        "styles": "",
-        "srs": "EPSG:4326",
-        "bbox": bbox,
-        "width": 3,
-        "height": 3,
-        "format": "image/tiff",
-    }
-
-    try:
-        resp = requests.get(MRLC_WMS_URL, params=params, timeout=20)
-        resp.raise_for_status()
-
-        # Try to read with rasterio if available
-        try:
-            import rasterio
-            from rasterio.io import MemoryFile
-            with MemoryFile(resp.content) as memfile:
-                with memfile.open() as dataset:
-                    data = dataset.read(1)  # Read first band
-                    center_val = data[1, 1]  # Center pixel of 3x3
-                    if center_val >= 0:
-                        return float(min(center_val, 100))
-        except ImportError:
-            pass
-
-        # Ultra-fallback: try PIL
-        try:
-            from PIL import Image
-            img = Image.open(BytesIO(resp.content))
-            pixel = img.getpixel((1, 1))
-            if isinstance(pixel, tuple):
-                pixel = pixel[0]
-            return float(min(max(pixel, 0), 100))
-        except ImportError:
-            pass
-
+        # Tile may not exist for this location (e.g., ocean)
         return None
 
+
+def _fetch_via_http(lat: float, lon: float, quadkey: str) -> float | None:
+    """
+    Fallback: Check if the tile exists via HTTP HEAD request.
+    Can't read pixel values without rasterio, but can confirm data coverage.
+
+    Returns a rough estimate based on tile existence (placeholder until
+    rasterio is available in the environment).
+    """
+    tile_url = _get_tile_url(quadkey)
+
+    try:
+        resp = requests.head(tile_url, timeout=10)
+        if resp.status_code == 200:
+            # Tile exists — we know there's data here, but can't read
+            # the exact pixel without rasterio. Return a sentinel that
+            # indicates "data available but value unknown".
+            # The pipeline should handle this gracefully.
+            return None  # TODO: implement HTTP range-based COG reading
+        else:
+            return None
     except Exception:
         return None
 
 
 def fetch_canopy_for_bbox(bbox: tuple, sample_points: int = 25) -> list:
     """
-    Sample canopy cover across a bounding box on a grid.
+    Sample canopy height across a bounding box on a grid.
 
     Args:
         bbox: (min_lon, min_lat, max_lon, max_lat)
         sample_points: Number of points to sample
 
     Returns:
-        list of float|None: Canopy cover percentages at each sample point.
+        list of float|None: Canopy heights (meters) at each sample point.
     """
     min_lon, min_lat, max_lon, max_lat = bbox
     grid_size = int(math.sqrt(sample_points))
@@ -173,17 +222,46 @@ def fetch_canopy_for_bbox(bbox: tuple, sample_points: int = 25) -> list:
     return values
 
 
-def get_shade_penalty(canopy_pct: float) -> float:
+def get_shade_penalty(canopy_height_m: float) -> float:
     """
-    Convert canopy cover percentage to a shade penalty (0.0 - 1.0).
+    Convert canopy height (meters) to a shade penalty (0.0 - 1.0).
 
-    More canopy = less penalty (more shade = more comfortable).
+    Taller trees = more shade = less penalty.
+    Thresholds based on urban forestry shade studies:
+    - >= 15m: Full shade canopy (large deciduous/evergreen) → 0.0 penalty
+    - 0m: No trees at all → 1.0 penalty
+    - Linear interpolation between
 
     Args:
-        canopy_pct: Tree canopy cover percentage (0-100)
+        canopy_height_m: Tree canopy height in meters
 
     Returns:
         float: Penalty value between 0.0 (full shade) and 1.0 (no shade)
     """
-    canopy_pct = max(0, min(100, canopy_pct))  # Clamp to 0-100
-    return 1.0 - (canopy_pct / 100.0)
+    canopy_height_m = max(0.0, float(canopy_height_m))
+    if canopy_height_m >= 15.0:
+        return 0.0
+    else:
+        return 1.0 - (canopy_height_m / 15.0)
+
+
+def height_to_cover_pct(canopy_height_m: float) -> float:
+    """
+    Convert canopy height to an estimated canopy cover percentage (0-100).
+
+    This is a rough mapping used by the scoring engine which expects
+    a 0-100 percentage input. Based on the relationship:
+    - 0m height → 0% cover
+    - >= 15m height → 100% cover (mature tree providing full shade)
+    - Linear interpolation between
+
+    Args:
+        canopy_height_m: Tree canopy height in meters
+
+    Returns:
+        float: Estimated canopy cover percentage (0-100)
+    """
+    canopy_height_m = max(0.0, float(canopy_height_m))
+    if canopy_height_m >= 15.0:
+        return 100.0
+    return (canopy_height_m / 15.0) * 100.0

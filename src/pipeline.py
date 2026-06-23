@@ -13,7 +13,7 @@ from shapely.geometry import mapping
 
 from src.network import fetch_walk_network, network_to_geodataframe
 from src.noise import fetch_noise_at_point, get_noise_penalty
-from src.canopy import fetch_canopy_at_point, get_shade_penalty
+from src.canopy import fetch_canopy_at_point, height_to_cover_pct
 from src.scoring import compute_comfort_score
 
 
@@ -28,7 +28,7 @@ def score_city_segments(place_query: str, max_segments: int = 500) -> gpd.GeoDat
                       Set to None to score all segments.
 
     Returns:
-        GeoDataFrame with columns: geometry, comfort_score, noise_dba, canopy_pct
+        GeoDataFrame with columns: geometry, comfort_score, noise_dba, canopy_height_m, canopy_pct
     """
     # Step 1: Fetch pedestrian network
     graph = fetch_walk_network(place_query)
@@ -40,7 +40,7 @@ def score_city_segments(place_query: str, max_segments: int = 500) -> gpd.GeoDat
 
     # Step 2: Sample environmental data at each segment's midpoint
     noise_values = []
-    canopy_values = []
+    canopy_height_values = []
 
     for idx, row in edges.iterrows():
         # Get the midpoint of each street segment
@@ -49,20 +49,26 @@ def score_city_segments(place_query: str, max_segments: int = 500) -> gpd.GeoDat
 
         # Fetch real environmental data
         noise = fetch_noise_at_point(lat, lon)
-        canopy = fetch_canopy_at_point(lat, lon)
+        canopy_height = fetch_canopy_at_point(lat, lon)  # meters
 
         noise_values.append(noise)
-        canopy_values.append(canopy)
+        canopy_height_values.append(canopy_height)
 
     edges = edges.copy()
     edges["noise_dba"] = noise_values
-    edges["canopy_pct"] = canopy_values
+    edges["canopy_height_m"] = canopy_height_values
+
+    # Convert canopy height (meters) to estimated cover percentage for scoring
+    edges["canopy_pct"] = [
+        height_to_cover_pct(h) if h is not None else 20.0
+        for h in canopy_height_values
+    ]
 
     # Step 3: Compute comfort scores
     scores = []
     for _, row in edges.iterrows():
         noise = row["noise_dba"] if row["noise_dba"] is not None else 50.0  # default moderate
-        canopy = row["canopy_pct"] if row["canopy_pct"] is not None else 20.0  # default low
+        canopy = row["canopy_pct"]  # already defaulted above
 
         score = compute_comfort_score(
             noise_dba=noise,
@@ -73,7 +79,7 @@ def score_city_segments(place_query: str, max_segments: int = 500) -> gpd.GeoDat
 
     edges["comfort_score"] = scores
 
-    return edges[["geometry", "comfort_score", "noise_dba", "canopy_pct"]]
+    return edges[["geometry", "comfort_score", "noise_dba", "canopy_height_m", "canopy_pct"]]
 
 
 def generate_comfort_geojson(place_query: str, max_segments: int = 200) -> dict:
@@ -99,6 +105,7 @@ def generate_comfort_geojson(place_query: str, max_segments: int = 200) -> dict:
             "properties": {
                 "comfort_score": row["comfort_score"],
                 "noise_dba": row["noise_dba"],
+                "canopy_height_m": row["canopy_height_m"],
                 "canopy_pct": row["canopy_pct"],
             },
         }

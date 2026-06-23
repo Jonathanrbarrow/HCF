@@ -6,6 +6,10 @@ osmnx
 geopandas
 shapely
 
+# Raster reading (Meta/WRI canopy height COGs on S3)
+rasterio
+boto3
+
 # Web API
 fastapi
 uvicorn
@@ -16,6 +20,3 @@ pydantic
 
 # Testing
 pytest
-
-# Optional: raster reading for canopy fallback
-# rasterio  # Uncomment if GDAL is available on your system
