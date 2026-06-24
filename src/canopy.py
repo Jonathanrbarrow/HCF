@@ -127,6 +127,98 @@ def fetch_canopy_at_point(lat: float, lon: float) -> float | None:
         return _fetch_via_http(lat, lon, quadkey)
 
 
+def fetch_canopy_batch(points: list[tuple[float, float]]) -> list[dict]:
+    """
+    Fetch canopy heights for a batch of points with quality tracking.
+
+    Groups points by QuadKey so each COG tile is opened only once.
+    Falls back to per-point fetching if the batch read fails.
+
+    Args:
+        points: List of (lat, lon) tuples.
+
+    Returns:
+        List of dicts (same order as input) with keys:
+          - "value": float or None
+          - "quality": "real" | "default" | "unavailable"
+    """
+    from collections import defaultdict
+
+    # Map each input index to its QuadKey and coordinates
+    quadkey_groups: dict[str, list[tuple[int, float, float]]] = defaultdict(list)
+    for idx, (lat, lon) in enumerate(points):
+        qk = _latlon_to_quadkey(lat, lon)
+        quadkey_groups[qk].append((idx, lat, lon))
+
+    results: list[dict | None] = [None] * len(points)
+
+    for quadkey, group in quadkey_groups.items():
+        if HAS_RASTERIO:
+            try:
+                _batch_read_tile(quadkey, group, results)
+                continue
+            except Exception:
+                pass  # fall through to per-point
+
+        # Per-point fallback (no rasterio, or batch read failed)
+        for idx, lat, lon in group:
+            try:
+                value = fetch_canopy_at_point(lat, lon)
+                if value is not None:
+                    results[idx] = {"value": value, "quality": "real"}
+                else:
+                    results[idx] = {"value": None, "quality": "default"}
+            except Exception:
+                results[idx] = {"value": None, "quality": "unavailable"}
+
+    return results  # type: ignore[return-value]
+
+
+def _batch_read_tile(
+    quadkey: str,
+    group: list[tuple[int, float, float]],
+    results: list[dict | None],
+) -> None:
+    """
+    Open a single COG tile and read pixel values for all points in *group*.
+
+    Populates *results* in-place. Raises on tile-level failures so the
+    caller can fall back to per-point fetching.
+    """
+    tile_url = _get_tile_s3_path(quadkey)
+
+    env_kwargs = {}
+    try:
+        import boto3
+        from botocore import UNSIGNED  # noqa: F811
+        from botocore.config import Config as BotoConfig  # noqa: F811
+        session = boto3.Session()
+        aws_session = AWSSession(session, aws_unsigned=True)
+        env_kwargs["session"] = aws_session
+    except ImportError:
+        tile_url = _get_tile_url(quadkey)
+
+    with rasterio.Env(**env_kwargs):
+        with rasterio.open(tile_url) as src:
+            for idx, lat, lon in group:
+                try:
+                    row, col = src.index(lon, lat)
+                    if row < 0 or row >= src.height or col < 0 or col >= src.width:
+                        results[idx] = {"value": None, "quality": "default"}
+                        continue
+                    window = Window(col, row, 1, 1)
+                    data = src.read(1, window=window)
+                    value = float(data[0, 0])
+                    if src.nodata is not None and value == src.nodata:
+                        results[idx] = {"value": None, "quality": "default"}
+                    elif value < 0:
+                        results[idx] = {"value": None, "quality": "default"}
+                    else:
+                        results[idx] = {"value": value, "quality": "real"}
+                except Exception:
+                    results[idx] = {"value": None, "quality": "unavailable"}
+
+
 def _fetch_via_rasterio(lat: float, lon: float, quadkey: str) -> float | None:
     """Read a single pixel from the COG using rasterio (efficient)."""
     tile_url = _get_tile_s3_path(quadkey)

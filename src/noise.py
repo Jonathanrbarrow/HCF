@@ -110,6 +110,38 @@ def fetch_noise_at_point(lat: float, lon: float) -> float | None:
         return None
 
 
+# Default noise value (dBA) when data is unavailable
+NOISE_DEFAULT_VALUE = 50.0
+
+
+def fetch_noise_batch(points: list[tuple[float, float]]) -> list[dict]:
+    """
+    Fetch noise levels for a batch of points with quality tracking.
+
+    Calls fetch_noise_at_point() per point (true batching via ArcGIS
+    multi-point identify is a future optimization).
+
+    Args:
+        points: List of (lat, lon) tuples.
+
+    Returns:
+        List of dicts with keys:
+          - "value": float or None
+          - "quality": "real" | "default" | "unavailable"
+    """
+    results = []
+    for lat, lon in points:
+        try:
+            value = fetch_noise_at_point(lat, lon)
+            if value is not None:
+                results.append({"value": value, "quality": "real"})
+            else:
+                results.append({"value": NOISE_DEFAULT_VALUE, "quality": "default"})
+        except Exception:
+            results.append({"value": None, "quality": "unavailable"})
+    return results
+
+
 def fetch_noise_for_bbox(bbox: tuple, sample_points: int = 25) -> list:
     """
     Sample noise levels across a bounding box on a grid.

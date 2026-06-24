@@ -107,5 +107,10 @@ The predecessor **worked for Gainesville, FL.** It had a polished frontend and p
 | 2026-06-18 | TDD test suite: 5 test files (network, noise, canopy, scoring, integration) with random city selection from top 100 US cities | `87ab10c` |
 | 2026-06-18 | Source modules: network, noise, canopy, scoring, pipeline — all city-agnostic, real API data | `87ab10c` |
 | 2026-06-18 | FastAPI server, Leaflet frontend, GitHub Actions CI (tests run in cloud since work PC blocks Python) | `cd493d0` |
-| 2026-06-23 | Switched canopy data from NLCD Tree Canopy Cover (30m, %) to Meta/WRI Global Canopy Height (1m, meters). 30× resolution improvement. | — |
+| 2026-06-23 | Switched canopy data from NLCD Tree Canopy Cover (30m, %) to Meta/WRI Global Canopy Height (1m, meters). 30× resolution improvement. | `cf2052b` |
+| 2026-06-24 | C4 architecture diagrams (docs/c4/) — living doc updated with every push. Added ADRs. | — |
+| 2026-06-24 | File-based caching (cache.py): walk networks 24h TTL, scored results 1h TTL | — |
+| 2026-06-24 | Batch data fetching: noise + canopy batch functions, canopy grouped by QuadKey tile | — |
+| 2026-06-24 | Per-segment data quality tracking: real/default/unavailable status for noise, canopy, heat | — |
+| 2026-06-24 | Frontend: configurable API base URL, dashed/dimmed segments for low-quality data | — |
 

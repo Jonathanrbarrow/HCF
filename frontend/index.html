@@ -291,7 +291,10 @@
         }
 
         // ── API Call ──
-        const API_BASE = window.location.origin;
+        // ── API Config ──
+        // Configurable: ?api=https://my-backend.com or default to same origin
+        const urlParams = new URLSearchParams(window.location.search);
+        const API_BASE = urlParams.get('api') || window.location.origin;
 
         async function analyzeCity(cityQuery) {
             const status = document.getElementById('status');
@@ -340,10 +343,13 @@
             comfortLayer = L.geoJSON(geojson, {
                 style: function(feature) {
                     const score = feature.properties.comfort_score;
+                    const dq = feature.properties.data_quality || {};
+                    const hasDefaults = Object.values(dq).some(v => v !== 'real');
                     return {
                         color: scoreToColor(score),
-                        weight: 3,
-                        opacity: 0.85,
+                        weight: hasDefaults ? 2 : 3,
+                        opacity: hasDefaults ? 0.45 : 0.85,
+                        dashArray: hasDefaults ? '6 4' : null,
                     };
                 },
                 onEachFeature: function(feature, layer) {

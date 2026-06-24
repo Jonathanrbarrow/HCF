@@ -157,6 +157,35 @@ class TestEndToEndPipeline:
             f"Pipeline may be returning data for the wrong city!"
         )
 
+    def test_features_have_data_quality(self, random_city):
+        """
+        QUESTION: Does each feature include data quality metadata
+        so the frontend can indicate which segments have real vs default data?
+
+        PASS CRITERIA:
+        - Each feature has properties.data_quality dict
+        - data_quality has keys: noise, canopy, heat
+        - Each value is one of: "real", "default", "unavailable", "fixed"
+        """
+        from src.pipeline import generate_comfort_geojson
+
+        geojson = generate_comfort_geojson(random_city["osmnx_query"])
+
+        valid_statuses = {"real", "default", "unavailable", "fixed"}
+
+        for i, feature in enumerate(geojson["features"][:20]):
+            props = feature.get("properties", {})
+            dq = props.get("data_quality")
+            assert dq is not None, f"Feature {i} missing data_quality"
+            assert isinstance(dq, dict), f"Feature {i} data_quality is not a dict"
+
+            for key in ("noise", "canopy", "heat"):
+                assert key in dq, f"Feature {i} data_quality missing '{key}'"
+                assert dq[key] in valid_statuses, (
+                    f"Feature {i} data_quality['{key}'] = '{dq[key]}' "
+                    f"is not a valid status"
+                )
+
 
 @pytest.mark.integration
 @pytest.mark.slow
