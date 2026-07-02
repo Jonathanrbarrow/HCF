@@ -9,11 +9,12 @@ Weights default to equal (1/3 each) but are user-adjustable.
 Score is always clamped to [0, 100].
 """
 
-# Default weights — equal importance
+# Default weights — equal importance (1/4 each)
 DEFAULT_WEIGHTS = {
-    "noise": 1.0 / 3.0,
-    "canopy": 1.0 / 3.0,
-    "heat": 1.0 / 3.0,
+    "noise": 0.25,
+    "canopy": 0.25,
+    "heat": 0.25,
+    "safety": 0.25,
 }
 
 # Maximum total penalty (sum of weighted penalties is scaled to this)
@@ -68,10 +69,23 @@ def _heat_penalty(heat_index: float) -> float:
         return (heat_index - 75.0) / (110.0 - 75.0)
 
 
+def _safety_penalty(safety_score: float) -> float:
+    """
+    Convert safety score (0-100) to penalty (0.0 - 1.0).
+
+    More safety = less penalty.
+    - 100 safety score: 0.0 (fully safe)
+    - 0 safety score: 1.0 (hostile/dangerous)
+    """
+    safety_score = max(0.0, min(100.0, float(safety_score)))
+    return 1.0 - (safety_score / 100.0)
+
+
 def compute_comfort_score(
     noise_dba: float = 0.0,
     canopy_pct: float = 100.0,
     heat_index: float = 70.0,
+    safety_score: float = 100.0,
     weights: dict | None = None,
 ) -> float:
     """
@@ -81,7 +95,8 @@ def compute_comfort_score(
         noise_dba: Noise level in dBA (0+)
         canopy_pct: Tree canopy cover percentage (0-100)
         heat_index: Heat index in °F
-        weights: Optional dict with keys "noise", "canopy", "heat".
+        safety_score: Road pedestrian safety score (0-100)
+        weights: Optional dict with keys "noise", "canopy", "heat", "safety".
                  Values are relative weights (will be normalized to sum to 1.0).
                  Defaults to equal weights.
 
@@ -103,6 +118,7 @@ def compute_comfort_score(
         w.get("noise", 0.0) * _noise_penalty(noise_dba)
         + w.get("canopy", 0.0) * _canopy_penalty(canopy_pct)
         + w.get("heat", 0.0) * _heat_penalty(heat_index)
+        + w.get("safety", 0.0) * _safety_penalty(safety_score)
     )
 
     # Score = 100 minus penalty scaled to 100
@@ -110,3 +126,4 @@ def compute_comfort_score(
 
     # Clamp to [0, 100]
     return max(0.0, min(100.0, round(score, 2)))
+

@@ -22,6 +22,25 @@ const StatsBar: React.FC<StatsBarProps> = ({ stats }) => {
       <span className="stat-item">
         Max: <strong>{stats.max.toFixed(1)}</strong>
       </span>
+      <button
+        onClick={() => window.print()}
+        style={{
+          marginLeft: 'auto',
+          background: 'var(--accent)',
+          color: '#fff',
+          border: 'none',
+          padding: '6px 12px',
+          borderRadius: '6px',
+          fontSize: '11px',
+          fontWeight: 600,
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '4px'
+        }}
+      >
+        🖨️ Export PDF Audit Report
+      </button>
     </div>
   );
 };

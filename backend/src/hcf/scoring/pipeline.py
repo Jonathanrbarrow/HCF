@@ -95,15 +95,91 @@ def score_city_segments(place_query: str, max_segments: int = 500) -> gpd.GeoDat
         for r in canopy_results
     ]
 
+    # Safety Scoring logic
+    import re
+    safety_scores = []
+    for _, row in edges.iterrows():
+        # 1. Base penalty by road classification (highway)
+        highway = row.get("highway", "unclassified")
+        if isinstance(highway, list):
+            highway = str(highway[0])
+        else:
+            highway = str(highway)
+
+        if highway in {"motorway", "trunk", "motorway_link", "trunk_link"}:
+            base = 0.0  # Hostile
+        elif highway in {"primary", "primary_link"}:
+            base = 20.0
+        elif highway in {"secondary", "secondary_link"}:
+            base = 40.0
+        elif highway in {"tertiary", "tertiary_link"}:
+            base = 60.0
+        elif highway in {"residential", "living_street"}:
+            base = 90.0
+        elif highway in {"footway", "pedestrian", "path", "cycleway"}:
+            base = 100.0  # Fully safe
+        else:
+            base = 70.0  # Moderate default
+
+        # 2. Sidewalk adjustments
+        sidewalk = row.get("sidewalk", "none")
+        if isinstance(sidewalk, list):
+            sidewalk = str(sidewalk[0])
+        else:
+            sidewalk = str(sidewalk)
+
+        if sidewalk in {"both", "left", "right", "yes"}:
+            base = min(100.0, base + 20.0)
+        elif sidewalk in {"none", "no"}:
+            base = max(0.0, base - 20.0)
+
+        # 3. Speed adjustments
+        maxspeed = row.get("maxspeed", "NaN")
+        if isinstance(maxspeed, list):
+            maxspeed = str(maxspeed[0])
+        else:
+            maxspeed = str(maxspeed)
+
+        speed_nums = re.findall(r'\d+', maxspeed)
+        if speed_nums:
+            speed_val = int(speed_nums[0])
+            if "km/h" in maxspeed or "kmh" in maxspeed:
+                if speed_val > 55:
+                    base = max(0.0, base - 10.0)
+            else:
+                if speed_val > 35:
+                    base = max(0.0, base - 10.0)
+
+        # 4. Lanes adjustments
+        lanes = row.get("lanes", "NaN")
+        if isinstance(lanes, list):
+            lanes = str(lanes[0])
+        else:
+            lanes = str(lanes)
+
+        lane_nums = re.findall(r'\d+', lanes)
+        if lane_nums:
+            lane_val = int(lane_nums[0])
+            if lane_val >= 4:
+                base = max(0.0, base - 10.0)
+
+        safety_scores.append(base)
+
+    edges["safety_score"] = safety_scores
+
     # Build per-segment data quality dicts
-    data_qualities = [
-        {
+    data_qualities = []
+    for i, (_, row) in enumerate(edges.iterrows()):
+        has_real_safety = ("sidewalk" in row and isinstance(row["sidewalk"], str) and row["sidewalk"] != "none") or \
+                           ("maxspeed" in row and isinstance(row["maxspeed"], str)) or \
+                           ("lanes" in row and isinstance(row["lanes"], str))
+        
+        data_qualities.append({
             "noise": noise_results[i]["quality"],
             "canopy": canopy_results[i]["quality"],
             "heat": heat_results[i]["quality"],
-        }
-        for i in range(len(edges))
-    ]
+            "safety": "real" if has_real_safety else "default"
+        })
     edges["data_quality"] = data_qualities
 
     # Step 5: Compute comfort scores
@@ -112,18 +188,20 @@ def score_city_segments(place_query: str, max_segments: int = 500) -> gpd.GeoDat
         noise = row["noise_dba"] if row["noise_dba"] is not None else settings.noise_default_dba
         canopy = row["canopy_pct"]
         heat = row["heat_index"] if row["heat_index"] is not None else settings.default_heat_index
+        safety = row["safety_score"]
 
         score = compute_comfort_score(
             noise_dba=noise,
             canopy_pct=canopy,
             heat_index=heat,
+            safety_score=safety,
         )
         scores.append(score)
 
     edges["comfort_score"] = scores
 
     return edges[["geometry", "comfort_score", "noise_dba",
-                   "canopy_height_m", "canopy_pct", "heat_index", "street_name", "data_quality"]]
+                   "canopy_height_m", "canopy_pct", "heat_index", "safety_score", "street_name", "data_quality"]]
 
 
 def generate_comfort_geojson(place_query: str, max_segments: int = 200) -> dict:
@@ -157,6 +235,7 @@ def generate_comfort_geojson(place_query: str, max_segments: int = 200) -> dict:
                 "canopy_height_m": row["canopy_height_m"],
                 "canopy_pct": row["canopy_pct"],
                 "heat_index": row["heat_index"],
+                "safety_score": row["safety_score"],
                 "street_name": row["street_name"],
                 "data_quality": row["data_quality"],
             },
@@ -164,6 +243,7 @@ def generate_comfort_geojson(place_query: str, max_segments: int = 200) -> dict:
         features.append(feature)
 
     result = {
+
         "type": "FeatureCollection",
         "features": features,
         "metadata": {

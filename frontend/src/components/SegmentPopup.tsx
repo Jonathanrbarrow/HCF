@@ -7,7 +7,7 @@ interface SegmentPopupProps {
 }
 
 const SegmentPopup: React.FC<SegmentPopupProps> = ({ properties }) => {
-  const { comfort_score, noise_dba, canopy_height_m, canopy_pct, heat_index, street_name, data_quality } =
+  const { comfort_score, noise_dba, canopy_height_m, canopy_pct, heat_index, safety_score, street_name, data_quality } =
     properties;
   const color = scoreToColor(comfort_score);
   const label = scoreToLabel(comfort_score);
@@ -50,6 +50,15 @@ const SegmentPopup: React.FC<SegmentPopupProps> = ({ properties }) => {
             🌡️ Apparent Temp: {heat_index.toFixed(1)}°F
             {dq && dq.heat !== 'real' && (
               <span style={{ color: '#f97316', marginLeft: 4 }} title="Estimated or fixed heat data">⚠</span>
+            )}
+            <br />
+          </>
+        )}
+        {safety_score !== null && (
+          <>
+            🛡️ Safety: {safety_score.toFixed(0)}/100
+            {dq && dq.safety !== 'real' && (
+              <span style={{ color: '#f97316', marginLeft: 4 }} title="Default road safety template applied">⚠</span>
             )}
           </>
         )}

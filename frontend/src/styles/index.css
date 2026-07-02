@@ -369,4 +369,222 @@ header h1 span {
   border: 1px solid;
 }
 
+/* ── Intervention Card (Floating Overlay) ────── */
+
+.intervention-card {
+  position: absolute;
+  top: 24px;
+  right: 24px;
+  width: 320px;
+  background: rgba(26, 29, 39, 0.85); /* Glassmorphism background */
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  z-index: 1000;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  display: flex;
+  flex-direction: column;
+  color: var(--text-primary);
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 20px;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+}
+
+.close-btn:hover {
+  color: var(--text-primary);
+}
+
+.workbench-street {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 10px;
+  margin-bottom: 10px;
+}
+
+.workbench-section {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 14px;
+}
+
+.workbench-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+}
+
+.workbench-row label {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.workbench-row span {
+  color: var(--text-secondary);
+}
+
+.btn-pill {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-pill:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-primary);
+}
+
+.btn-pill.active {
+  background: var(--accent-hover);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.reset-btn {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+  padding: 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 8px;
+  transition: all 0.2s ease;
+}
+
+.reset-btn:hover {
+  background: rgba(239, 68, 68, 0.18);
+  border-color: #ef4444;
+}
+
+/* ── Print Styles ───────────────────────────── */
+
+.print-only-header {
+  display: none;
+}
+
+@media print {
+  body {
+    background: white !important;
+    color: black !important;
+  }
+
+  header,
+  .weight-panel,
+  #status,
+  .close-btn,
+  .reset-btn,
+  .workbench-section input[type="range"],
+  .btn-pill,
+  .legend-container,
+  .stats-bar button,
+  .search-container {
+    display: none !important;
+  }
+
+  .print-only-header {
+    display: block !important;
+    margin-bottom: 24px;
+    border-bottom: 2px solid #333;
+    padding-bottom: 12px;
+  }
+
+  .print-only-header h1 {
+    font-size: 26px;
+    font-weight: 700;
+    margin: 0;
+    color: #1a1d27 !important;
+  }
+
+  .print-only-header p {
+    font-size: 12px;
+    margin: 4px 0 0 0;
+    color: #4a5568 !important;
+  }
+
+  /* Reset layout constraints for print layout flow */
+  #root, body, html {
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  /* Expand overlays so they print in-line */
+  .deficit-panel,
+  .intervention-card {
+    position: static !important;
+    width: 100% !important;
+    max-height: none !important;
+    background: transparent !important;
+    color: black !important;
+    box-shadow: none !important;
+    border: 1px solid #e2e8f0 !important;
+    margin-top: 24px;
+    page-break-inside: avoid;
+  }
+
+  .deficit-panel h3,
+  .intervention-card h3 {
+    color: #1a1d27 !important;
+  }
+
+  .deficit-item {
+    background: #f7fafc !important;
+    border: 1px solid #e2e8f0 !important;
+    color: black !important;
+  }
+
+  .street-title {
+    color: #1a1d27 !important;
+  }
+
+  .score-badge {
+    background-color: transparent !important;
+    border-color: #4a5568 !important;
+    color: black !important;
+  }
+
+  /* Format leaflet map for print dimensions */
+  #map {
+    height: 480px !important;
+    width: 100% !important;
+    border: 1px solid #cbd5e0 !important;
+    position: relative !important;
+  }
+
+  .stats-bar {
+    position: static !important;
+    background: #f7fafc !important;
+    color: #1a1d27 !important;
+    border: 1px solid #cbd5e0 !important;
+    box-shadow: none !important;
+    margin-top: 24px;
+    page-break-inside: avoid;
+  }
+
+  .stats-bar .stat-val {
+    color: #1a1d27 !important;
+  }
+}
+
+
+
 

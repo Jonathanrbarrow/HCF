@@ -4,23 +4,40 @@ import ComfortMap from './components/Map';
 import Legend from './components/Legend';
 import StatsBar from './components/StatsBar';
 import DeficitPanel from './components/DeficitPanel';
+import InterventionCard from './components/InterventionCard';
 import { useComfortData } from './hooks/useComfortData';
 import { computeComfortScoreClient } from './utils/scoring';
+import type { ComfortFeature } from './types/comfort';
+
+// Helper to generate a unique client-side ID for a street segment based on properties + coordinates
+const getSegmentId = (f: ComfortFeature): string => {
+  const geom = f.geometry as any;
+  const coords = geom.coordinates;
+  const firstCoord = geom.type === 'LineString' ? coords[0] : coords[0][0];
+  return `${f.properties.street_name}#${firstCoord[0].toFixed(5)},${firstCoord[1].toFixed(5)}`;
+};
 
 const App: React.FC = () => {
-  const { data, stats, loading, error, analyze } = useComfortData();
+  const { data, loading, error, analyze } = useComfortData();
 
-  // Weight states (default to equal weights, i.e. 33.3% each)
-  const [wNoise, setWNoise] = useState(33);
-  const [wCanopy, setWCanopy] = useState(33);
-  const [wHeat, setWHeat] = useState(34);
+  // Weight states (default to equal weights, i.e. 25% each)
+  const [wNoise, setWNoise] = useState(25);
+  const [wCanopy, setWCanopy] = useState(25);
+  const [wHeat, setWHeat] = useState(25);
+  const [wSafety, setWSafety] = useState(25);
 
-  // Active highlighted segment from DeficitPanel
+  // Active highlighted segment for workbench
   const [selectedSegment, setSelectedSegment] = useState<{
     lat: number;
     lon: number;
     properties: any;
+    id: string;
   } | null>(null);
+
+  // Scenario modeling overrides: segment_id -> overridden values
+  const [interventions, setInterventions] = useState<
+    Record<string, { canopy_pct?: number; noise_dba?: number; safety_score?: number }>
+  >({});
 
   const statusClass = loading ? 'loading' : error ? 'error' : data ? 'success' : '';
   const statusText = loading
@@ -31,38 +48,138 @@ const App: React.FC = () => {
         ? `${data.features.length} segments scored`
         : 'Ready';
 
-  // Reset selected segment when city changes
+  // Reset selected segment and active proposals when city changes
   const handleSearch = (city: string) => {
     setSelectedSegment(null);
+    setInterventions({});
     analyze(city);
   };
 
-  // Dynamically compute stats based on active weights
+  // Safe handler to update overrides
+  const handleUpdateIntervention = (
+    id: string,
+    updates: { canopy_pct?: number; noise_dba?: number; safety_score?: number } | null
+  ) => {
+    setInterventions((prev) => {
+      const next = { ...prev };
+      if (updates === null) {
+        delete next[id];
+      } else {
+        next[id] = updates;
+      }
+      return next;
+    });
+
+    // Sync selectedSegment properties if active
+    if (selectedSegment && selectedSegment.id === id && updates) {
+      setSelectedSegment((prev) => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          properties: {
+            ...prev.properties,
+            ...updates,
+          },
+        };
+      });
+    }
+  };
+
+  // Intercept data to inject active interventions for map layer rendering
+  const intervenedData = useMemo(() => {
+    if (!data) return null;
+    return {
+      ...data,
+      features: data.features.map((f) => {
+        const id = getSegmentId(f);
+        const override = interventions[id];
+        if (override) {
+          const props = { ...f.properties, ...override };
+          // Recompute static score on properties for default popup reads
+          props.comfort_score = computeComfortScoreClient(
+            props.noise_dba,
+            props.canopy_pct,
+            props.heat_index,
+            props.safety_score,
+            wNoise,
+            wCanopy,
+            wHeat,
+            wSafety
+          );
+          return { ...f, properties: props };
+        }
+        return f;
+      }),
+    };
+  }, [data, interventions, wNoise, wCanopy, wHeat, wSafety]);
+
+  // Dynamically compute stats based on active weights and active interventions
   const adjustedStats = useMemo(() => {
     if (!data || data.features.length === 0) return null;
-    const scores = data.features.map((f) => {
-      const { noise_dba, canopy_pct, heat_index } = f.properties;
+    
+    // Baseline stats
+    const baselineScores = data.features.map((f) => {
+      const { noise_dba, canopy_pct, heat_index, safety_score } = f.properties;
       return computeComfortScoreClient(
         noise_dba,
         canopy_pct,
         heat_index,
+        safety_score,
         wNoise,
         wCanopy,
         wHeat,
+        wSafety
       );
     });
 
-    const sum = scores.reduce((a, b) => a + b, 0);
+    // Proposed stats (incorporates active interventions)
+    const proposedScores = data.features.map((f) => {
+      const id = getSegmentId(f);
+      const override = interventions[id];
+      const noise = override?.noise_dba !== undefined ? override.noise_dba : f.properties.noise_dba;
+      const canopy = override?.canopy_pct !== undefined ? override.canopy_pct : f.properties.canopy_pct;
+      const heat = f.properties.heat_index;
+      const safety = override?.safety_score !== undefined ? override.safety_score : f.properties.safety_score;
+
+      return computeComfortScoreClient(
+        noise,
+        canopy,
+        heat,
+        safety,
+        wNoise,
+        wCanopy,
+        wHeat,
+        wSafety
+      );
+    });
+
+    const sumBaseline = baselineScores.reduce((a, b) => a + b, 0);
+    const sumProposed = proposedScores.reduce((a, b) => a + b, 0);
+
     return {
-      segments: scores.length,
-      avg: sum / scores.length,
-      min: Math.min(...scores),
-      max: Math.max(...scores),
+      segments: baselineScores.length,
+      avg: sumProposed / proposedScores.length,
+      min: Math.min(...proposedScores),
+      max: Math.max(...proposedScores),
+      baselineAvg: sumBaseline / baselineScores.length,
     };
-  }, [data, wNoise, wCanopy, wHeat]);
+  }, [data, interventions, wNoise, wCanopy, wHeat, wSafety]);
+
+  // Net gain from scenario modeling
+  const netGain = adjustedStats
+    ? adjustedStats.avg - adjustedStats.baselineAvg
+    : 0;
 
   return (
     <>
+      {/* Print Report Header (Hidden on screen, shown in print PDF) */}
+      <div className="print-only-header">
+        <h1>Human Comfort Factors (HCF) Walkability Audit</h1>
+        <p>
+          Generated on {new Date().toLocaleDateString()} | Active Scenario: {Object.keys(interventions).length} Street Interventions
+        </p>
+      </div>
+
       <header>
         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
           <h1>
@@ -103,27 +220,56 @@ const App: React.FC = () => {
               onChange={(e) => setWHeat(Number(e.target.value))}
             />
           </div>
+          <div className="slider-group">
+            <label>🛡️ Safety Weight: {wSafety}%</label>
+            <input
+              type="range"
+              min="0"
+              max="100"
+              value={wSafety}
+              onChange={(e) => setWSafety(Number(e.target.value))}
+            />
+          </div>
         </div>
 
-        <span id="status" className={statusClass}>
-          {statusText}
-        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          {netGain > 0 && (
+            <span style={{ fontSize: 11, fontWeight: 700, padding: '4px 8px', borderRadius: 6, backgroundColor: 'rgba(34,197,94,0.15)', color: '#22c55e', border: '1px solid rgba(34,197,94,0.3)' }}>
+              ✨ Scenario Gain: +{netGain.toFixed(2)} pts
+            </span>
+          )}
+          <span id="status" className={statusClass}>
+            {statusText}
+          </span>
+        </div>
       </header>
 
       <div style={{ display: 'flex', flex: 1, position: 'relative', overflow: 'hidden' }}>
         <ComfortMap
-          data={data}
+          data={intervenedData}
           wNoise={wNoise}
           wCanopy={wCanopy}
           wHeat={wHeat}
+          wSafety={wSafety}
           selectedSegment={selectedSegment}
         />
         <DeficitPanel
-          data={data}
+          data={intervenedData}
           wNoise={wNoise}
           wCanopy={wCanopy}
           wHeat={wHeat}
-          onSelectSegment={(lat, lon, properties) => setSelectedSegment({ lat, lon, properties })}
+          wSafety={wSafety}
+          onSelectSegment={(lat, lon, properties) => {
+            const f = { geometry: { type: 'LineString', coordinates: [[lon, lat]] }, properties } as any;
+            const id = getSegmentId(f);
+            setSelectedSegment({ lat, lon, properties, id });
+          }}
+        />
+        <InterventionCard
+          segment={selectedSegment}
+          intervention={selectedSegment ? interventions[selectedSegment.id] : undefined}
+          onUpdateIntervention={handleUpdateIntervention}
+          onClose={() => setSelectedSegment(null)}
         />
       </div>
       <StatsBar stats={adjustedStats} />

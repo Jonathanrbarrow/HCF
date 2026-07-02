@@ -3,6 +3,7 @@ export interface DataQuality {
   noise: 'real' | 'default' | 'unavailable';
   canopy: 'real' | 'default' | 'unavailable';
   heat: 'real' | 'default' | 'unavailable' | 'fixed';
+  safety: 'real' | 'default' | 'unavailable';
 }
 
 export interface ComfortProperties {
@@ -11,6 +12,7 @@ export interface ComfortProperties {
   canopy_height_m: number | null;
   canopy_pct: number | null;
   heat_index: number | null;
+  safety_score: number | null;
   street_name: string;
   data_quality?: DataQuality;
 }

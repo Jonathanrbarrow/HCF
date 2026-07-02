@@ -44,6 +44,20 @@ class TestScoringFormula:
         score = compute_comfort_score(noise_dba=0, canopy_pct=100, heat_index=70)
         assert score == 100.0, f"Perfect conditions should score 100, got {score}"
 
+    def test_safety_impacts_score(self):
+        """
+        QUESTION: Does a lower safety score lower the overall comfort score?
+        """
+        from hcf.scoring.engine import compute_comfort_score
+
+        # Base conditions: quiet, shaded, cool
+        perfect_safety = compute_comfort_score(noise_dba=0, canopy_pct=100, heat_index=70, safety_score=100)
+        poor_safety = compute_comfort_score(noise_dba=0, canopy_pct=100, heat_index=70, safety_score=40)
+
+        assert perfect_safety == 100.0
+        assert poor_safety < 100.0, f"Poor safety did not reduce the score: {poor_safety}"
+
+
     def test_worst_conditions_score_near_zero(self):
         """
         QUESTION: Do terrible environmental conditions produce a score near 0?

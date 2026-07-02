@@ -23,6 +23,7 @@ interface ComfortMapProps {
   wNoise: number;
   wCanopy: number;
   wHeat: number;
+  wSafety: number;
   selectedSegment: { lat: number; lon: number; properties: any } | null;
 }
 
@@ -53,6 +54,7 @@ const ComfortMap: React.FC<ComfortMapProps> = ({
   wNoise,
   wCanopy,
   wHeat,
+  wSafety,
   selectedSegment,
 }) => {
   const mapRef = useRef<LeafletMap | null>(null);
@@ -61,7 +63,7 @@ const ComfortMap: React.FC<ComfortMapProps> = ({
   // Bump key whenever data or weights change to force GeoJSON layer re-render
   useEffect(() => {
     geoJsonKey.current += 1;
-  }, [data, wNoise, wCanopy, wHeat]);
+  }, [data, wNoise, wCanopy, wHeat, wSafety]);
 
   // Fit bounds when data arrives
   useEffect(() => {
@@ -90,8 +92,8 @@ const ComfortMap: React.FC<ComfortMapProps> = ({
   const style = useCallback((feature: GeoJSON.Feature | undefined): PathOptions => {
     if (!feature) return {};
     const f = feature as unknown as ComfortFeature;
-    const { noise_dba, canopy_pct, heat_index } = f.properties;
-    const score = computeComfortScoreClient(noise_dba, canopy_pct, heat_index, wNoise, wCanopy, wHeat);
+    const { noise_dba, canopy_pct, heat_index, safety_score } = f.properties;
+    const score = computeComfortScoreClient(noise_dba, canopy_pct, heat_index, safety_score, wNoise, wCanopy, wHeat, wSafety);
     const dq = f.properties.data_quality;
     const hasDefaults = dq ? Object.values(dq).some((v) => v !== 'real') : false;
 
@@ -101,24 +103,24 @@ const ComfortMap: React.FC<ComfortMapProps> = ({
       opacity: hasDefaults ? 0.45 : 0.85,
       dashArray: hasDefaults ? '6 4' : undefined,
     };
-  }, [wNoise, wCanopy, wHeat]);
+  }, [wNoise, wCanopy, wHeat, wSafety]);
 
   const onEachFeature = useCallback(
     (feature: GeoJSON.Feature, layer: Layer) => {
       const f = feature as unknown as ComfortFeature;
-      const { noise_dba, canopy_pct, heat_index } = f.properties;
-      const score = computeComfortScoreClient(noise_dba, canopy_pct, heat_index, wNoise, wCanopy, wHeat);
+      const { noise_dba, canopy_pct, heat_index, safety_score } = f.properties;
+      const score = computeComfortScoreClient(noise_dba, canopy_pct, heat_index, safety_score, wNoise, wCanopy, wHeat, wSafety);
       
       const popupHtml = renderToString(
         <SegmentPopup properties={{ ...f.properties, comfort_score: score }} />,
       );
       (layer as L.Path).bindPopup(popupHtml);
     },
-    [wNoise, wCanopy, wHeat],
+    [wNoise, wCanopy, wHeat, wSafety],
   );
 
   // Memoize the data key so GeoJSON only re-renders when data or weights actually change
-  const dataKey = useMemo(() => geoJsonKey.current, [data, wNoise, wCanopy, wHeat]);
+  const dataKey = useMemo(() => geoJsonKey.current, [data, wNoise, wCanopy, wHeat, wSafety]);
 
   return (
     <MapContainer
