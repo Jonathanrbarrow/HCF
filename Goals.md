@@ -113,6 +113,9 @@ The predecessor **worked for Gainesville, FL.** It had a polished frontend and p
 | 2026-06-24 | Batch data fetching: noise + canopy batch functions, canopy grouped by QuadKey tile | `a11b953` |
 | 2026-06-24 | Per-segment data quality tracking: real/default/unavailable status for noise, canopy, heat | `a11b953` |
 | 2026-06-24 | Frontend: configurable API base URL, dashed/dimmed segments for low-quality data | `a11b953` |
-| 2026-07-02 | Startup Restructure: Moved backend to structured package, migrated frontend to Vite + React + TypeScript, set up Docker dev environment, and updated CI | — |
+| 2026-07-02 | Startup Restructure: Moved backend to structured package, migrated frontend to Vite + React + TypeScript, set up Docker dev environment, and updated CI | `2e6f4bb` |
+| 2026-07-02 | Feature: Integrated Open-Meteo apparent temperature (heat index) API with batch support, Pydantic settings, and React popups | `decc451` |
+| 2026-07-02 | Feature: Implemented comfort-adjusted routing engine (NetworkX/Dijkstra) with endpoint, automated test suite, and React weight sliders | `7781934` |
+
 
 
