@@ -120,6 +120,8 @@ The predecessor **worked for Gainesville, FL.** It had a polished frontend and p
 | 2026-07-02 | Feature: Implemented comfort-adjusted routing engine (NetworkX/Dijkstra) with endpoint, automated test suite, and React weight sliders | `7781934` |
 | 2026-07-02 | Refactor: Removed routing stubs to align with 'mapping for comfort' planning goal | `98046b9` |
 | 2026-07-02 | Feature: Implemented Deficit Analysis side panel to list high-stress corridors, map panning, and street name matching | `d1ff0ba` |
+| 2026-07-02 | Feature: Added Scenario Modeler, Safety factor, PDF Report exports, and released v0.3.0 | `7a2e8cc` |
+
 
 
 
