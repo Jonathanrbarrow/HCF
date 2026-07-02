@@ -5,7 +5,7 @@
 ```mermaid
 graph TB
     subgraph Browser["🖥️ Browser"]
-        FE["📄 Frontend\nindex.html\n\nVanilla HTML + JS\nLeaflet map rendering\nConfigurable API base"]
+        FE["📄 React Frontend\nApp.tsx\n\nReact + TS + Leaflet\nInteractive comfort weighting\nConfigurable API base"]
     end
 
     subgraph Server["⚙️ Python Backend"]
@@ -41,7 +41,7 @@ graph TB
 
 | Container | Technology | Purpose |
 |-----------|-----------|---------|
-| **Frontend** | HTML + JS + Leaflet | Renders scored map, handles user input |
+| **Frontend** | React + TypeScript + Vite + Leaflet | Renders scored map, handles dynamic comfort weight adjustments |
 | **FastAPI Server** | Python / uvicorn | REST API, serves frontend static files |
 | **File Cache** | JSON/pickle on disk | Caches walk networks (24h) and scored results (1h) |
 | **Pipeline** | Python (osmnx, rasterio, requests) | Orchestrates data fetching, scoring, GeoJSON assembly |

@@ -11,7 +11,7 @@ Traditional walkability metrics (e.g., Walk Score) measure **proximity** — how
 
 ## The Solution
 
-Score every walkable street segment in a US city on a **0–100 Comfort Scale** by layering environmental stressors — heat, noise, and shade — on top of the pedestrian network. Deliver results through a lightweight browser frontend as a color-coded interactive map.
+Score every walkable street segment in a US city on a **0–100 Comfort Scale** by layering environmental stressors — heat, noise, and shade — on top of the pedestrian network. Deliver results through a lightweight browser frontend as a color-coded interactive map designed for urban planning and corridor-level spatial analysis.
 
 **Scoring formula:**
 
@@ -21,7 +21,8 @@ Comfort Score = 100 - [(wH × Heat_Penalty) + (wN × Noise_Penalty) + (wS × Sha
 
 - All penalties normalized to 0.0–1.0 against human comfort thresholds
 - Weights (w) are adjustable by the user
-- Scored per street segment (vector, not raster) for future routing compatibility
+- Scored per street segment (vector road centerlines) for precise block-by-block planning audits
+
 
 ---
 
@@ -73,10 +74,10 @@ Comfort Score = 100 - [(wH × Heat_Penalty) + (wN × Noise_Penalty) + (wS × Sha
 ### Phase 3 — Scale & Extend
 > Goal: Power-user features and broader adoption.
 
-- [ ] Comfort-weighted routing ("find the most comfortable walk")
+- [ ] Deficit Analysis (highlighting and listing streets with highest environmental stress)
 - [ ] Exportable reports (PDF/image for planner presentations)
 - [ ] Comparison mode (side-by-side cities or before/after scenarios)
-- [ ] Additional data layers (air quality, shade/canopy, safety)
+- [ ] Additional data layers (air quality, safety/sidewalk width)
 
 ---
 
@@ -93,8 +94,9 @@ The predecessor **worked for Gainesville, FL.** It had a polished frontend and p
 1. **No faking the hard parts.** The backend computation pipeline must use real data, real spatial joins, and real scoring from day one. No mock data, no hardcoded coordinates, no city-specific shortcuts that look right for one place but break everywhere else. If a data source isn't ready, the feature waits — we don't stub it with fake numbers and move on.
 2. **Backend before polish.** The previous project had a great frontend on top of a hollow backend. This time: get the computation pipeline working and generalizing *first*. The frontend can be ugly until the engine is proven.
 3. **Test with multiple cities immediately.** Every feature gets validated against at least 2-3 different US cities (varying size, region, data availability) before it's marked complete. A feature that only works for one city is a bug, not a feature.
-4. **No city-specific assumptions in the pipeline.** The data fetching, spatial joining, and scoring must be purely parameterized by city name or bounding box. Zero hardcoded lat/lon, zero city-name conditionals, zero locally cached datasets for one specific place.
-5. **Validate the geospatial stack early.** `osmnx` and `geopandas` have notoriously difficult Windows installs (GDAL/GEOS C dependencies). Confirm these actually run on the dev machine before building anything on top of them.
+4. **No Individual Routing/Navigation.** HCF is a spatial analysis, arborist planning, and real estate design audit tool. It is NOT a Google Maps replacement for turn-by-turn navigation. We explicitly prioritize whole-corridor comfort mapping, deficit analysis, and planning tools over pedestrian pathfinding.
+5. **No city-specific assumptions in the pipeline.** The data fetching, spatial joining, and scoring must be purely parameterized by city name or bounding box. Zero hardcoded lat/lon, zero city-name conditionals, zero locally cached datasets for one specific place.
+6. **Validate the geospatial stack early.** `osmnx` and `geopandas` have notoriously difficult Windows installs (GDAL/GEOS C dependencies). Confirm these actually run on the dev machine before building anything on top of them.
 
 ---
 

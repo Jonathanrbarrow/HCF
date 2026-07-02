@@ -24,6 +24,7 @@ graph TB
         NET["network.py\n\nfetch_walk_network()\nnetwork_to_geodataframe()"]
         NOISE["noise.py\n\nfetch_noise_at_point()\nfetch_noise_batch()\nget_noise_penalty()"]
         CANOPY["canopy.py\n\nfetch_canopy_at_point()\nfetch_canopy_batch()\nheight_to_cover_pct()\n_latlon_to_quadkey()"]
+        HEAT["heat.py\n\nfetch_heat_at_point()\nfetch_heat_batch()"]
     end
 
     subgraph scoring_engine["scoring.py — Pure Computation"]
@@ -37,6 +38,7 @@ graph TB
     NC -->|miss| NET
     SCS --> NOISE
     SCS --> CANOPY
+    SCS --> HEAT
     SCS --> SCORE
 
     style EP fill:#6c63ff,color:#fff
@@ -47,6 +49,7 @@ graph TB
     style NET fill:#22c55e,color:#fff
     style NOISE fill:#eab308,color:#000
     style CANOPY fill:#22c55e,color:#fff
+    style HEAT fill:#22c55e,color:#fff
     style SCORE fill:#8b5cf6,color:#fff
 ```
 
@@ -62,6 +65,7 @@ sequenceDiagram
     participant N as network.py
     participant NZ as noise.py
     participant C as canopy.py
+    participant H as heat.py
     participant SC as scoring.py
 
     U->>S: GET /api/v1/comfort?city=Denver
@@ -88,6 +92,9 @@ sequenceDiagram
         C->>C: group by QuadKey
         C-->>P: canopy_height[] + quality[]
 
+        P->>H: fetch_heat_batch(midpoints)
+        H-->>P: apparent_temp[] + quality[]
+
         loop per segment
             P->>SC: compute_comfort_score()
             SC-->>P: score
@@ -108,5 +115,6 @@ sequenceDiagram
 | `network.py` | ~50 | Walk network fetching | osmnx |
 | `noise.py` | ~130 | DOT noise map queries | requests |
 | `canopy.py` | ~220 | Meta/WRI canopy height reads | rasterio, boto3 |
+| `heat.py` | ~100 | Open-Meteo apparent temperature reads | requests |
 | `scoring.py` | ~100 | Comfort formula (pure math) | none |
 | `cache.py` | ~80 | File-based caching with TTL | none (stdlib) |
