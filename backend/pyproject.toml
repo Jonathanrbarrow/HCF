@@ -1,0 +1,39 @@
+[project]
+name = "hcf"
+version = "0.2.0"
+description = "Human Comfort Factors — walk comfort scoring for US cities"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi",
+    "uvicorn[standard]",
+    "osmnx",
+    "geopandas",
+    "shapely",
+    "requests",
+    "rasterio",
+    "boto3",
+    "pydantic",
+    "pydantic-settings",
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "httpx"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "network: tests that fetch OSM pedestrian network data",
+    "noise: tests that fetch DOT noise map data",
+    "canopy: tests that fetch tree canopy data",
+    "scoring: tests for the comfort scoring engine",
+    "integration: end-to-end pipeline tests",
+    "slow: tests that may take >30s due to API calls",
+]
+addopts = "-v --tb=short -s"
+
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
