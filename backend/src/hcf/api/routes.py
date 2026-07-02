@@ -4,7 +4,7 @@ HCF API routes — serves comfort-scored GeoJSON to the frontend.
 from fastapi import APIRouter, HTTPException, Query
 
 from hcf.config import settings
-from hcf.scoring.pipeline import generate_comfort_geojson
+from hcf.scoring.pipeline import generate_comfort_geojson, generate_route_geojson
 
 router = APIRouter()
 
@@ -42,3 +42,37 @@ def get_comfort_map(
             status_code=500,
             detail=f"Failed to generate comfort map for '{city}': {str(e)}",
         )
+
+
+@router.get("/api/v1/route")
+def get_comfort_route(
+    start_lat: float = Query(..., description="Start latitude"),
+    start_lon: float = Query(..., description="Start longitude"),
+    end_lat: float = Query(..., description="End latitude"),
+    end_lon: float = Query(..., description="End longitude"),
+    w_noise: float = Query(33.3, description="Noise weight"),
+    w_canopy: float = Query(33.3, description="Canopy/shade weight"),
+    w_heat: float = Query(33.3, description="Heat weight"),
+):
+    """
+    Compute two walking paths between start and end points:
+    1. Shortest path (by physical distance)
+    2. Comfort-adjusted path (maximizing comfort based on weights)
+    """
+    try:
+        geojson = generate_route_geojson(
+            start_lat=start_lat,
+            start_lon=start_lon,
+            end_lat=end_lat,
+            end_lon=end_lon,
+            w_noise=w_noise,
+            w_canopy=w_canopy,
+            w_heat=w_heat,
+        )
+        return geojson
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to compute route: {str(e)}",
+        )
+
