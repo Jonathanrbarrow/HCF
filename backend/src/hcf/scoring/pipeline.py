@@ -19,6 +19,7 @@ from hcf.config import settings
 from hcf.data.network import fetch_walk_network, network_to_geodataframe
 from hcf.data.noise import fetch_noise_batch
 from hcf.data.canopy import fetch_canopy_batch, height_to_cover_pct
+from hcf.data.heat import fetch_heat_batch
 from hcf.scoring.engine import compute_comfort_score
 from hcf.cache.store import (
     get_network_cache, set_network_cache,
@@ -47,7 +48,7 @@ def score_city_segments(place_query: str, max_segments: int = 500) -> gpd.GeoDat
 
     Returns:
         GeoDataFrame with columns: geometry, comfort_score, noise_dba,
-        canopy_height_m, canopy_pct, data_quality
+        canopy_height_m, canopy_pct, heat_index, data_quality
     """
     # Step 1: Fetch pedestrian network (cached)
     graph = _fetch_network_cached(place_query)
@@ -66,11 +67,13 @@ def score_city_segments(place_query: str, max_segments: int = 500) -> gpd.GeoDat
     # Step 3: Batch fetch environmental data
     noise_results = fetch_noise_batch(midpoints)
     canopy_results = fetch_canopy_batch(midpoints)
+    heat_results = fetch_heat_batch(midpoints)
 
     # Step 4: Assemble columns
     edges = edges.copy()
     edges["noise_dba"] = [r["value"] for r in noise_results]
     edges["canopy_height_m"] = [r["value"] for r in canopy_results]
+    edges["heat_index"] = [r["value"] for r in heat_results]
 
     # Convert canopy height to estimated cover percentage
     edges["canopy_pct"] = [
@@ -83,7 +86,7 @@ def score_city_segments(place_query: str, max_segments: int = 500) -> gpd.GeoDat
         {
             "noise": noise_results[i]["quality"],
             "canopy": canopy_results[i]["quality"],
-            "heat": "fixed",
+            "heat": heat_results[i]["quality"],
         }
         for i in range(len(edges))
     ]
@@ -94,18 +97,19 @@ def score_city_segments(place_query: str, max_segments: int = 500) -> gpd.GeoDat
     for _, row in edges.iterrows():
         noise = row["noise_dba"] if row["noise_dba"] is not None else settings.noise_default_dba
         canopy = row["canopy_pct"]
+        heat = row["heat_index"] if row["heat_index"] is not None else settings.default_heat_index
 
         score = compute_comfort_score(
             noise_dba=noise,
             canopy_pct=canopy,
-            heat_index=settings.default_heat_index,
+            heat_index=heat,
         )
         scores.append(score)
 
     edges["comfort_score"] = scores
 
     return edges[["geometry", "comfort_score", "noise_dba",
-                   "canopy_height_m", "canopy_pct", "data_quality"]]
+                   "canopy_height_m", "canopy_pct", "heat_index", "data_quality"]]
 
 
 def generate_comfort_geojson(place_query: str, max_segments: int = 200) -> dict:
@@ -138,6 +142,7 @@ def generate_comfort_geojson(place_query: str, max_segments: int = 200) -> dict:
                 "noise_dba": row["noise_dba"],
                 "canopy_height_m": row["canopy_height_m"],
                 "canopy_pct": row["canopy_pct"],
+                "heat_index": row["heat_index"],
                 "data_quality": row["data_quality"],
             },
         }

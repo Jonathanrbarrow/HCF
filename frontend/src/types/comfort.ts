@@ -1,8 +1,8 @@
 /** GeoJSON feature properties returned by the HCF backend */
 export interface DataQuality {
-  noise: 'real' | 'default' | 'estimated';
-  canopy: 'real' | 'default' | 'estimated';
-  shade: 'real' | 'default' | 'estimated';
+  noise: 'real' | 'default' | 'unavailable';
+  canopy: 'real' | 'default' | 'unavailable';
+  heat: 'real' | 'default' | 'unavailable' | 'fixed';
 }
 
 export interface ComfortProperties {
@@ -10,6 +10,7 @@ export interface ComfortProperties {
   noise_dba: number | null;
   canopy_height_m: number | null;
   canopy_pct: number | null;
+  heat_index: number | null;
   data_quality?: DataQuality;
 }
 

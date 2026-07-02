@@ -28,6 +28,7 @@ class Settings(BaseSettings):
 
     # Scoring
     default_heat_index: float = 85.0
+    heat_api_url: str = "https://api.open-meteo.com/v1/forecast"
 
     # API
     max_segments_default: int = 200

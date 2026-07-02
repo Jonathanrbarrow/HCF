@@ -42,6 +42,8 @@ jobs:
         run: python -m pytest tests/test_noise.py -v --tb=short
       - name: Run canopy API tests
         run: python -m pytest tests/test_canopy.py -v --tb=short
+      - name: Run heat API tests
+        run: python -m pytest tests/test_heat.py -v --tb=short
 
   network-tests:
     name: "Backend: OSM Network"

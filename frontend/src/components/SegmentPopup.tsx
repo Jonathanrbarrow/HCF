@@ -7,7 +7,7 @@ interface SegmentPopupProps {
 }
 
 const SegmentPopup: React.FC<SegmentPopupProps> = ({ properties }) => {
-  const { comfort_score, noise_dba, canopy_height_m, canopy_pct, data_quality } =
+  const { comfort_score, noise_dba, canopy_height_m, canopy_pct, heat_index, data_quality } =
     properties;
   const color = scoreToColor(comfort_score);
   const label = scoreToLabel(comfort_score);
@@ -26,17 +26,25 @@ const SegmentPopup: React.FC<SegmentPopupProps> = ({ properties }) => {
           <>
             🔊 Noise: {noise_dba.toFixed(1)} dBA
             {dq && dq.noise !== 'real' && (
-              <span style={{ color: '#f97316', marginLeft: 4 }}>⚠</span>
+              <span style={{ color: '#f97316', marginLeft: 4 }} title="Estimated noise data">⚠</span>
             )}
             <br />
           </>
         )}
         {canopy_height_m !== null && canopy_pct !== null && (
           <>
-            🌳 Canopy: {canopy_height_m.toFixed(1)}m ({canopy_pct.toFixed(0)}%
-            shade)
+            🌳 Canopy: {canopy_height_m.toFixed(1)}m ({canopy_pct.toFixed(0)}% shade)
             {dq && dq.canopy !== 'real' && (
-              <span style={{ color: '#f97316', marginLeft: 4 }}>⚠</span>
+              <span style={{ color: '#f97316', marginLeft: 4 }} title="Estimated canopy data">⚠</span>
+            )}
+            <br />
+          </>
+        )}
+        {heat_index !== null && (
+          <>
+            🌡️ Apparent Temp: {heat_index.toFixed(1)}°F
+            {dq && dq.heat !== 'real' && (
+              <span style={{ color: '#f97316', marginLeft: 4 }} title="Estimated or fixed heat data">⚠</span>
             )}
           </>
         )}
