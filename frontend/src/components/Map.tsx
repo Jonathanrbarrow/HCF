@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useCallback, useMemo } from 'react';
 import { renderToString } from 'react-dom/server';
-import { MapContainer, TileLayer, GeoJSON } from 'react-leaflet';
+import { MapContainer, TileLayer, GeoJSON, useMap } from 'react-leaflet';
+import L from 'leaflet';
 import type { Map as LeafletMap, Layer, PathOptions } from 'leaflet';
 import type { ComfortGeoJSON, ComfortFeature } from '../types/comfort';
 import { scoreToColor } from '../utils/colors';
@@ -22,9 +23,38 @@ interface ComfortMapProps {
   wNoise: number;
   wCanopy: number;
   wHeat: number;
+  selectedSegment: { lat: number; lon: number; properties: any } | null;
 }
 
-const ComfortMap: React.FC<ComfortMapProps> = ({ data, wNoise, wCanopy, wHeat }) => {
+// Controller component to handle programmatically flying and opening popups
+const MapController: React.FC<{ selectedSegment: ComfortMapProps['selectedSegment'] }> = ({
+  selectedSegment,
+}) => {
+  const map = useMap();
+
+  useEffect(() => {
+    if (!selectedSegment) return;
+    const { lat, lon, properties } = selectedSegment;
+
+    map.flyTo([lat, lon], 18, { animate: true, duration: 1.2 });
+
+    const popupHtml = renderToString(<SegmentPopup properties={properties} />);
+    L.popup()
+      .setLatLng([lat, lon])
+      .setContent(popupHtml)
+      .openOn(map);
+  }, [selectedSegment, map]);
+
+  return null;
+};
+
+const ComfortMap: React.FC<ComfortMapProps> = ({
+  data,
+  wNoise,
+  wCanopy,
+  wHeat,
+  selectedSegment,
+}) => {
   const mapRef = useRef<LeafletMap | null>(null);
   const geoJsonKey = useRef(0);
 
@@ -113,6 +143,7 @@ const ComfortMap: React.FC<ComfortMapProps> = ({ data, wNoise, wCanopy, wHeat })
           onEachFeature={onEachFeature}
         />
       )}
+      <MapController selectedSegment={selectedSegment} />
     </MapContainer>
   );
 };

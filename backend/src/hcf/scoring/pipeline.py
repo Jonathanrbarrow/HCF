@@ -75,6 +75,20 @@ def score_city_segments(place_query: str, max_segments: int = 500) -> gpd.GeoDat
     edges["canopy_height_m"] = [r["value"] for r in canopy_results]
     edges["heat_index"] = [r["value"] for r in heat_results]
 
+    # Extract street name safely
+    if "name" in edges.columns:
+        street_names = []
+        for val in edges["name"]:
+            if isinstance(val, list):
+                street_names.append(str(val[0]))
+            elif isinstance(val, str):
+                street_names.append(val)
+            else:
+                street_names.append("Unnamed Path")
+        edges["street_name"] = street_names
+    else:
+        edges["street_name"] = "Unnamed Path"
+
     # Convert canopy height to estimated cover percentage
     edges["canopy_pct"] = [
         height_to_cover_pct(r["value"]) if r["value"] is not None else 20.0
@@ -109,7 +123,7 @@ def score_city_segments(place_query: str, max_segments: int = 500) -> gpd.GeoDat
     edges["comfort_score"] = scores
 
     return edges[["geometry", "comfort_score", "noise_dba",
-                   "canopy_height_m", "canopy_pct", "heat_index", "data_quality"]]
+                   "canopy_height_m", "canopy_pct", "heat_index", "street_name", "data_quality"]]
 
 
 def generate_comfort_geojson(place_query: str, max_segments: int = 200) -> dict:
@@ -143,6 +157,7 @@ def generate_comfort_geojson(place_query: str, max_segments: int = 200) -> dict:
                 "canopy_height_m": row["canopy_height_m"],
                 "canopy_pct": row["canopy_pct"],
                 "heat_index": row["heat_index"],
+                "street_name": row["street_name"],
                 "data_quality": row["data_quality"],
             },
         }

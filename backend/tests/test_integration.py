@@ -89,6 +89,10 @@ class TestEndToEndPipeline:
             assert 0 <= score <= 100, (
                 f"Feature {i} comfort_score out of range: {score}"
             )
+            assert "street_name" in props, f"Feature {i} missing street_name"
+            assert isinstance(props["street_name"], str), (
+                f"Feature {i} street_name is not a string: {props['street_name']}"
+            )
 
     def test_geojson_is_serializable(self, random_city):
         """

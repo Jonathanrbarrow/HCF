@@ -11,6 +11,7 @@ export interface ComfortProperties {
   canopy_height_m: number | null;
   canopy_pct: number | null;
   heat_index: number | null;
+  street_name: string;
   data_quality?: DataQuality;
 }
 

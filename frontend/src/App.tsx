@@ -3,6 +3,7 @@ import SearchBar from './components/SearchBar';
 import ComfortMap from './components/Map';
 import Legend from './components/Legend';
 import StatsBar from './components/StatsBar';
+import DeficitPanel from './components/DeficitPanel';
 import { useComfortData } from './hooks/useComfortData';
 import { computeComfortScoreClient } from './utils/scoring';
 
@@ -14,6 +15,13 @@ const App: React.FC = () => {
   const [wCanopy, setWCanopy] = useState(33);
   const [wHeat, setWHeat] = useState(34);
 
+  // Active highlighted segment from DeficitPanel
+  const [selectedSegment, setSelectedSegment] = useState<{
+    lat: number;
+    lon: number;
+    properties: any;
+  } | null>(null);
+
   const statusClass = loading ? 'loading' : error ? 'error' : data ? 'success' : '';
   const statusText = loading
     ? 'Fetching data...'
@@ -22,6 +30,12 @@ const App: React.FC = () => {
       : data
         ? `${data.features.length} segments scored`
         : 'Ready';
+
+  // Reset selected segment when city changes
+  const handleSearch = (city: string) => {
+    setSelectedSegment(null);
+    analyze(city);
+  };
 
   // Dynamically compute stats based on active weights
   const adjustedStats = useMemo(() => {
@@ -54,7 +68,7 @@ const App: React.FC = () => {
           <h1>
             <span>HCF</span> Human Comfort Factors
           </h1>
-          <SearchBar onSearch={analyze} loading={loading} />
+          <SearchBar onSearch={handleSearch} loading={loading} />
         </div>
 
         {/* Dynamic Weight Sliders Panel */}
@@ -96,7 +110,22 @@ const App: React.FC = () => {
         </span>
       </header>
 
-      <ComfortMap data={data} wNoise={wNoise} wCanopy={wCanopy} wHeat={wHeat} />
+      <div style={{ display: 'flex', flex: 1, position: 'relative', overflow: 'hidden' }}>
+        <ComfortMap
+          data={data}
+          wNoise={wNoise}
+          wCanopy={wCanopy}
+          wHeat={wHeat}
+          selectedSegment={selectedSegment}
+        />
+        <DeficitPanel
+          data={data}
+          wNoise={wNoise}
+          wCanopy={wCanopy}
+          wHeat={wHeat}
+          onSelectSegment={(lat, lon, properties) => setSelectedSegment({ lat, lon, properties })}
+        />
+      </div>
       <StatsBar stats={adjustedStats} />
       <Legend />
 
