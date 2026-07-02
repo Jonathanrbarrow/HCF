@@ -118,6 +118,9 @@ The predecessor **worked for Gainesville, FL.** It had a polished frontend and p
 | 2026-07-02 | Startup Restructure: Moved backend to structured package, migrated frontend to Vite + React + TypeScript, set up Docker dev environment, and updated CI | `2e6f4bb` |
 | 2026-07-02 | Feature: Integrated Open-Meteo apparent temperature (heat index) API with batch support, Pydantic settings, and React popups | `decc451` |
 | 2026-07-02 | Feature: Implemented comfort-adjusted routing engine (NetworkX/Dijkstra) with endpoint, automated test suite, and React weight sliders | `7781934` |
+| 2026-07-02 | Refactor: Removed routing stubs to align with 'mapping for comfort' planning goal | `98046b9` |
+| 2026-07-02 | Feature: Implemented Deficit Analysis side panel to list high-stress corridors, map panning, and street name matching | `d1ff0ba` |
+
 
 
 
