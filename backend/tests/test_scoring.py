@@ -67,7 +67,7 @@ class TestScoringFormula:
         """
         from hcf.scoring.engine import compute_comfort_score
 
-        score = compute_comfort_score(noise_dba=90, canopy_pct=0, heat_index=115)
+        score = compute_comfort_score(noise_dba=90, canopy_pct=0, heat_index=115, safety_score=0)
         assert score <= 10, f"Worst conditions should score <=10, got {score}"
         assert score >= 0, f"Score should never be negative, got {score}"
 
