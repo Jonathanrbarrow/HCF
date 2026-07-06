@@ -1,6 +1,6 @@
 [project]
 name = "hcf"
-version = "0.2.0"
+version = "0.4.0"
 description = "Human Comfort Factors — walk comfort scoring for US cities"
 requires-python = ">=3.11"
 dependencies = [

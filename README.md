@@ -5,9 +5,14 @@ Walk comfort scoring for any US city. See how comfortable every street really is
 ## What It Does
 
 Type a US city name → get a color-coded map showing how comfortable each street is to walk on, scored by:
-- 🔊 **Noise** — US DOT transportation noise data (dBA)
-- 🌳 **Canopy** — Meta/WRI tree canopy height at 1m resolution
-- 🌡️ **Heat** — (Phase 2: NOAA weather data)
+- 🔊 **Noise** — US DOT transportation noise raster (2020, dBA)
+- 🌳 **Canopy** — Meta/WRI tree canopy height at 1m resolution (shade coverage)
+- 🌡️ **Heat** — Open-Meteo historical summer peak apparent temperature (3-year avg)
+- 🛡️ **Safety** — OSM road classification, sidewalk presence, speed limits, lane count
+- 🚗 **Traffic** — FHWA HPMS Annual Average Daily Traffic (AADT)
+- 🌬️ **Air Quality** — EPA AirNow AQI *(available, disabled by default)*
+
+All data is **historical/static** — results are reproducible regardless of when you query. The tool is designed for **intervention modeling**: "if we plant trees and calm traffic on this corridor, how much does comfort improve?"
 
 ## Quick Start
 
