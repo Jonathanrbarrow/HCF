@@ -77,6 +77,11 @@ const StatsBar: React.FC<StatsBarProps> = ({ stats, data }) => {
       </span>
       <span className="stat-item">
         Avg Score: <strong>{stats.avg.toFixed(1)}</strong>
+        {stats.baselineAvg !== stats.avg && (
+          <span style={{ fontSize: 10, color: stats.avg > stats.baselineAvg ? '#22c55e' : '#f97316', marginLeft: 4 }}>
+            ({stats.avg > stats.baselineAvg ? '+' : ''}{(stats.avg - stats.baselineAvg).toFixed(1)} from baseline)
+          </span>
+        )}
       </span>
       <span className="stat-item">
         Min: <strong>{stats.min.toFixed(1)}</strong>
@@ -84,6 +89,17 @@ const StatsBar: React.FC<StatsBarProps> = ({ stats, data }) => {
       <span className="stat-item">
         Max: <strong>{stats.max.toFixed(1)}</strong>
       </span>
+      {data && data.features.length > 0 && data.features[0].properties.data_quality && (
+        <span className="stat-item" style={{ fontSize: 10, color: 'var(--text-secondary)' }} title="% of segments with real data per factor">
+          Data: {(['noise', 'canopy', 'heat', 'safety', 'traffic'] as const).map((key) => {
+            const total = data.features.length;
+            const real = data.features.filter((f) => f.properties.data_quality?.[key] === 'real').length;
+            const pct = Math.round((real / total) * 100);
+            const emoji = key === 'noise' ? '🔊' : key === 'canopy' ? '🌳' : key === 'heat' ? '🌡️' : key === 'safety' ? '🛡️' : '🚗';
+            return <span key={key} style={{ marginRight: 6, color: pct > 70 ? '#22c55e' : pct > 30 ? '#f97316' : '#ef4444' }}>{emoji}{pct}%</span>;
+          })}
+        </span>
+      )}
       <button
         onClick={() => window.print()}
         style={{ ...btnStyle, marginLeft: 'auto' }}
