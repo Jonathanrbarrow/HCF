@@ -14,7 +14,7 @@ Type a US city name → get a color-coded map showing how comfortable each stree
 ### Docker (recommended)
 
 ```bash
-docker-compose up
+docker compose up
 ```
 
 - Frontend: http://localhost:5173

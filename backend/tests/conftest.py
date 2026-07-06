@@ -11,20 +11,18 @@ import time
 from .cities import TOP_100_US_CITIES, get_random_cities, get_bbox_around_point
 
 
-def pytest_configure(config):
-    """Register custom markers."""
-    config.addinivalue_line("markers", "network: tests that fetch OSM pedestrian network data")
-    config.addinivalue_line("markers", "noise: tests that fetch DOT noise map data")
-    config.addinivalue_line("markers", "canopy: tests that fetch NLCD tree canopy data")
-    config.addinivalue_line("markers", "scoring: tests for the comfort scoring engine")
-    config.addinivalue_line("markers", "integration: end-to-end pipeline tests")
-    config.addinivalue_line("markers", "slow: tests that may take >30s due to API calls")
+def pytest_addoption(parser):
+    parser.addoption(
+        "--random-seed", type=int, default=None,
+        help="Fixed random seed for reproducible test runs",
+    )
 
 
 @pytest.fixture(scope="session")
-def random_seed():
+def random_seed(request):
     """Generate and log a random seed for the test session so failures are reproducible."""
-    seed = int(time.time())
+    provided = request.config.getoption("--random-seed")
+    seed = provided if provided is not None else int(time.time())
     print(f"\n{'='*60}")
     print(f"  TEST SESSION RANDOM SEED: {seed}")
     print(f"  Re-run with this seed to reproduce: --random-seed={seed}")
@@ -33,9 +31,10 @@ def random_seed():
 
 
 @pytest.fixture
-def random_city(random_seed):
+def random_city(random_seed, request):
     """Pick one random city from the top 100. Different for each test function."""
-    city = get_random_cities(n=1, seed=random_seed + id(random_city))[0]
+    offset = hash(request.node.nodeid)
+    city = get_random_cities(n=1, seed=random_seed + offset)[0]
     print(f"  [Random City] {city['city']}, {city['state']}")
     return city
 

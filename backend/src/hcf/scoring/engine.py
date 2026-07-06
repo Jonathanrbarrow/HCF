@@ -2,10 +2,11 @@
 Scoring module — computes Comfort Scores from environmental data.
 
 Formula:
-  Comfort Score = 100 - [(wN × Noise_Penalty) + (wS × Shade_Penalty) + (wH × Heat_Penalty)]
+  Comfort Score = 100 - [(wN × Noise_Penalty) + (wC × Canopy_Penalty)
+                         + (wH × Heat_Penalty) + (wS × Safety_Penalty)]
 
 Each penalty is normalized to 0.0 - 1.0.
-Weights default to equal (1/3 each) but are user-adjustable.
+Weights default to equal (1/4 each) and are user-adjustable.
 Score is always clamped to [0, 100].
 """
 

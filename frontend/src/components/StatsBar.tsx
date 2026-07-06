@@ -38,6 +38,7 @@ const StatsBar: React.FC<StatsBarProps> = ({ stats }) => {
           alignItems: 'center',
           gap: '4px'
         }}
+        aria-label="Print report"
       >
         🖨️ Export PDF Audit Report
       </button>

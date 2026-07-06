@@ -33,4 +33,5 @@ export interface CityStats {
   avg: number;
   min: number;
   max: number;
+  baselineAvg: number;
 }

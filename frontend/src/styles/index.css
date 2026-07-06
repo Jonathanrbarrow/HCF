@@ -495,7 +495,7 @@ header h1 span {
   .reset-btn,
   .workbench-section input[type="range"],
   .btn-pill,
-  .legend-container,
+  .legend,
   .stats-bar button,
   .search-container {
     display: none !important;
@@ -580,9 +580,7 @@ header h1 span {
     page-break-inside: avoid;
   }
 
-  .stats-bar .stat-val {
-    color: #1a1d27 !important;
-  }
+
 }
 
 

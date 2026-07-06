@@ -124,6 +124,8 @@ def fetch_noise_batch(points: list[tuple[float, float]]) -> list[dict]:
           - "value": float or None
           - "quality": "real" | "default" | "unavailable"
     """
+    # TODO: Use concurrent.futures.ThreadPoolExecutor for parallel requests.
+    # Sequential fetching is slow for large segment counts (200+ serial HTTP calls).
     results = []
     for lat, lon in points:
         try:

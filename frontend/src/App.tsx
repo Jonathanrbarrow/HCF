@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import type { ComfortProperties } from './types/comfort';
 import SearchBar from './components/SearchBar';
 import ComfortMap from './components/Map';
 import Legend from './components/Legend';
@@ -11,10 +12,15 @@ import type { ComfortFeature } from './types/comfort';
 
 // Helper to generate a unique client-side ID for a street segment based on properties + coordinates
 const getSegmentId = (f: ComfortFeature): string => {
-  const geom = f.geometry as any;
-  const coords = geom.coordinates;
-  const firstCoord = geom.type === 'LineString' ? coords[0] : coords[0][0];
-  return `${f.properties.street_name}#${firstCoord[0].toFixed(5)},${firstCoord[1].toFixed(5)}`;
+  const geom = f.geometry;
+  if (geom.type === 'MultiLineString') {
+    const firstCoord = geom.coordinates[0][0];
+    return `${f.properties.street_name}#${firstCoord[0].toFixed(5)},${firstCoord[1].toFixed(5)}`;
+  } else if (geom.type === 'LineString') {
+    const firstCoord = geom.coordinates[0];
+    return `${f.properties.street_name}#${firstCoord[0].toFixed(5)},${firstCoord[1].toFixed(5)}`;
+  }
+  return `${f.properties.street_name}#unknown`;
 };
 
 const App: React.FC = () => {
@@ -30,7 +36,7 @@ const App: React.FC = () => {
   const [selectedSegment, setSelectedSegment] = useState<{
     lat: number;
     lon: number;
-    properties: any;
+    properties: ComfortProperties;
     id: string;
   } | null>(null);
 
@@ -71,9 +77,9 @@ const App: React.FC = () => {
     });
 
     // Sync selectedSegment properties if active
-    if (selectedSegment && selectedSegment.id === id && updates) {
+    if (updates) {
       setSelectedSegment((prev) => {
-        if (!prev) return null;
+        if (!prev || prev.id !== id) return prev;
         return {
           ...prev,
           properties: {
@@ -159,8 +165,8 @@ const App: React.FC = () => {
     return {
       segments: baselineScores.length,
       avg: sumProposed / proposedScores.length,
-      min: Math.min(...proposedScores),
-      max: Math.max(...proposedScores),
+      min: proposedScores.reduce((a, b) => Math.min(a, b), Infinity),
+      max: proposedScores.reduce((a, b) => Math.max(a, b), -Infinity),
       baselineAvg: sumBaseline / baselineScores.length,
     };
   }, [data, interventions, wNoise, wCanopy, wHeat, wSafety]);
@@ -198,6 +204,7 @@ const App: React.FC = () => {
               max="100"
               value={wNoise}
               onChange={(e) => setWNoise(Number(e.target.value))}
+              aria-label="Noise weight"
             />
           </div>
           <div className="slider-group">
@@ -208,6 +215,7 @@ const App: React.FC = () => {
               max="100"
               value={wCanopy}
               onChange={(e) => setWCanopy(Number(e.target.value))}
+              aria-label="Shade weight"
             />
           </div>
           <div className="slider-group">
@@ -218,6 +226,7 @@ const App: React.FC = () => {
               max="100"
               value={wHeat}
               onChange={(e) => setWHeat(Number(e.target.value))}
+              aria-label="Heat weight"
             />
           </div>
           <div className="slider-group">
@@ -228,6 +237,7 @@ const App: React.FC = () => {
               max="100"
               value={wSafety}
               onChange={(e) => setWSafety(Number(e.target.value))}
+              aria-label="Safety weight"
             />
           </div>
         </div>
@@ -260,7 +270,7 @@ const App: React.FC = () => {
           wHeat={wHeat}
           wSafety={wSafety}
           onSelectSegment={(lat, lon, properties) => {
-            const f = { geometry: { type: 'LineString', coordinates: [[lon, lat]] }, properties } as any;
+            const f = { geometry: { type: 'LineString' as const, coordinates: [[lon, lat]] }, properties } as ComfortFeature;
             const id = getSegmentId(f);
             setSelectedSegment({ lat, lon, properties, id });
           }}

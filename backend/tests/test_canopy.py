@@ -127,7 +127,7 @@ class TestCanopyDataFetch:
         non_null_portland = [v for v in values_portland if v is not None]
         assert len(non_null_portland) >= 1, "Guaranteed canopy bbox returned no data"
 
-    def test_canopy_works_across_cities(self, three_random_cities):
+    def test_canopy_works_across_cities(self):
         """
         QUESTION: Does canopy fetching work across different cities?
 

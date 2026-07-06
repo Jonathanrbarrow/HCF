@@ -1,10 +1,15 @@
 """
 HCF API routes — serves comfort-scored GeoJSON to the frontend.
 """
+import logging
+
 from fastapi import APIRouter, HTTPException, Query
 
+from hcf import __version__
 from hcf.config import settings
 from hcf.scoring.pipeline import generate_comfort_geojson
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -12,7 +17,7 @@ router = APIRouter()
 @router.get("/health")
 def health_check():
     """Health check endpoint."""
-    return {"status": "ok", "version": "0.2.0"}
+    return {"status": "ok", "version": __version__}
 
 
 @router.get("/api/v1/comfort")
@@ -37,10 +42,16 @@ def get_comfort_map(
             max_segments=max_segments,
         )
         return geojson
+    except (ValueError, KeyError) as e:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Invalid city query: '{city}'. Please provide a valid US city name.",
+        )
     except Exception as e:
+        logger.exception("Failed to generate comfort map for '%s'", city)
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to generate comfort map for '{city}': {str(e)}",
+            detail="An internal error occurred while generating the comfort map. Please try again.",
         )
 
 

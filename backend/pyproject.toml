@@ -28,6 +28,7 @@ markers = [
     "scoring: tests for the comfort scoring engine",
     "integration: end-to-end pipeline tests",
     "slow: tests that may take >30s due to API calls",
+    "heat: tests that fetch heat/temperature data",
 ]
 addopts = "-v --tb=short -s"
 

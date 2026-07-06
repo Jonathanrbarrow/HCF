@@ -11,7 +11,10 @@ Features:
   - Batch environmental data fetching (grouped by tile/region)
   - Per-segment data quality tracking
 """
+import re
+
 import osmnx as ox
+import pandas as pd
 import geopandas as gpd
 from shapely.geometry import mapping
 
@@ -80,7 +83,7 @@ def score_city_segments(place_query: str, max_segments: int = 500) -> gpd.GeoDat
         street_names = []
         for val in edges["name"]:
             if isinstance(val, list):
-                street_names.append(str(val[0]))
+                street_names.append(str(val[0]) if val else "Unnamed Path")
             elif isinstance(val, str):
                 street_names.append(val)
             else:
@@ -96,13 +99,12 @@ def score_city_segments(place_query: str, max_segments: int = 500) -> gpd.GeoDat
     ]
 
     # Safety Scoring logic
-    import re
     safety_scores = []
     for _, row in edges.iterrows():
         # 1. Base penalty by road classification (highway)
         highway = row.get("highway", "unclassified")
         if isinstance(highway, list):
-            highway = str(highway[0])
+            highway = str(highway[0]) if highway else "unclassified"
         else:
             highway = str(highway)
 
@@ -124,7 +126,7 @@ def score_city_segments(place_query: str, max_segments: int = 500) -> gpd.GeoDat
         # 2. Sidewalk adjustments
         sidewalk = row.get("sidewalk", "none")
         if isinstance(sidewalk, list):
-            sidewalk = str(sidewalk[0])
+            sidewalk = str(sidewalk[0]) if sidewalk else "none"
         else:
             sidewalk = str(sidewalk)
 
@@ -136,7 +138,7 @@ def score_city_segments(place_query: str, max_segments: int = 500) -> gpd.GeoDat
         # 3. Speed adjustments
         maxspeed = row.get("maxspeed", "NaN")
         if isinstance(maxspeed, list):
-            maxspeed = str(maxspeed[0])
+            maxspeed = str(maxspeed[0]) if maxspeed else "NaN"
         else:
             maxspeed = str(maxspeed)
 
@@ -153,7 +155,7 @@ def score_city_segments(place_query: str, max_segments: int = 500) -> gpd.GeoDat
         # 4. Lanes adjustments
         lanes = row.get("lanes", "NaN")
         if isinstance(lanes, list):
-            lanes = str(lanes[0])
+            lanes = str(lanes[0]) if lanes else "NaN"
         else:
             lanes = str(lanes)
 
@@ -170,9 +172,9 @@ def score_city_segments(place_query: str, max_segments: int = 500) -> gpd.GeoDat
     # Build per-segment data quality dicts
     data_qualities = []
     for i, (_, row) in enumerate(edges.iterrows()):
-        has_real_safety = ("sidewalk" in row and isinstance(row["sidewalk"], str) and row["sidewalk"] != "none") or \
-                           ("maxspeed" in row and isinstance(row["maxspeed"], str)) or \
-                           ("lanes" in row and isinstance(row["lanes"], str))
+        has_real_safety = ("sidewalk" in row.index and pd.notna(row.get("sidewalk")) and row["sidewalk"] not in ("none", "unknown")) or \
+                           ("maxspeed" in row.index and pd.notna(row.get("maxspeed"))) or \
+                           ("lanes" in row.index and pd.notna(row.get("lanes")))
         
         data_qualities.append({
             "noise": noise_results[i]["quality"],
@@ -185,9 +187,9 @@ def score_city_segments(place_query: str, max_segments: int = 500) -> gpd.GeoDat
     # Step 5: Compute comfort scores
     scores = []
     for _, row in edges.iterrows():
-        noise = row["noise_dba"] if row["noise_dba"] is not None else settings.noise_default_dba
+        noise = row["noise_dba"] if pd.notna(row["noise_dba"]) else settings.noise_default_dba
         canopy = row["canopy_pct"]
-        heat = row["heat_index"] if row["heat_index"] is not None else settings.default_heat_index
+        heat = row["heat_index"] if pd.notna(row["heat_index"]) else settings.default_heat_index
         safety = row["safety_score"]
 
         score = compute_comfort_score(

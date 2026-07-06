@@ -29,9 +29,9 @@ const InterventionCard: React.FC<InterventionCardProps> = ({
   const { street_name, noise_dba, canopy_pct, safety_score, comfort_score } = segment.properties;
 
   // Active values (either proposed or original)
-  const activeCanopy = intervention?.canopy_pct !== undefined ? intervention.canopy_pct : (canopy_pct || 20);
-  const activeNoise = intervention?.noise_dba !== undefined ? intervention.noise_dba : (noise_dba || 65);
-  const activeSafety = intervention?.safety_score !== undefined ? intervention.safety_score : (safety_score || 70);
+  const activeCanopy = intervention?.canopy_pct !== undefined ? intervention.canopy_pct : (canopy_pct ?? 20);
+  const activeNoise = intervention?.noise_dba !== undefined ? intervention.noise_dba : (noise_dba ?? 65);
+  const activeSafety = intervention?.safety_score !== undefined ? intervention.safety_score : (safety_score ?? 70);
 
   const isIntervened = intervention !== undefined;
 
@@ -47,7 +47,7 @@ const InterventionCard: React.FC<InterventionCardProps> = ({
   };
 
   const handleNoiseLevel = (level: 'none' | 'minor' | 'major') => {
-    let targetNoise = noise_dba || 65;
+    let targetNoise = noise_dba ?? 65;
     if (level === 'minor') targetNoise = 55;
     if (level === 'major') targetNoise = 45;
 
@@ -60,7 +60,7 @@ const InterventionCard: React.FC<InterventionCardProps> = ({
   const handleSidewalkUpgrade = (active: boolean) => {
     onUpdateIntervention(segment.id, {
       ...intervention,
-      safety_score: active ? 100 : (safety_score || 70),
+      safety_score: active ? 100 : (safety_score ?? 70),
     });
   };
 
@@ -68,7 +68,7 @@ const InterventionCard: React.FC<InterventionCardProps> = ({
     <div className="intervention-card">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
         <h3 style={{ margin: 0, fontSize: 14, fontWeight: 600 }}>🛠️ Audit & Design Workbench</h3>
-        <button className="close-btn" onClick={onClose}>×</button>
+        <button className="close-btn" onClick={onClose} aria-label="Close workbench">×</button>
       </div>
 
       <div className="workbench-street">

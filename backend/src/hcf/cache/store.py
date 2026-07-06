@@ -17,7 +17,7 @@ from pathlib import Path
 
 from hcf.config import settings
 
-CACHE_DIR = Path(settings.cache_dir)
+CACHE_DIR = Path(settings.cache_dir).resolve()
 TTL_NETWORK = settings.cache_ttl_network
 TTL_RESULT = settings.cache_ttl_result
 
@@ -51,7 +51,7 @@ def _atomic_write(path: Path, data: bytes) -> None:
         with open(fd, "wb") as f:
             f.write(data)
         Path(tmp).replace(path)
-    except BaseException:
+    except Exception:
         Path(tmp).unlink(missing_ok=True)
         raise
 
@@ -63,6 +63,8 @@ def get_cached(key: str, ttl_seconds: int) -> object | None:
     for ext, loader in [("pkl", pickle.loads), ("json", lambda b: json.loads(b))]:
         path = _path_for(key, ext)
         if _is_fresh(path, ttl_seconds):
+            # SECURITY: pickle.loads can execute arbitrary code.
+            # Ensure the cache directory is trusted and not world-writable.
             return loader(path.read_bytes())
     return None
 
@@ -74,6 +76,22 @@ def set_cached(key: str, value, fmt: str = "pkl") -> None:
     else:
         data = pickle.dumps(value)
     _atomic_write(_path_for(key, fmt), data)
+    # Probabilistic cache cleanup (1 in 20 calls)
+    import random
+    if random.randint(1, 20) == 1:
+        cleanup_cache()
+
+
+def cleanup_cache(max_age_seconds: int | None = None) -> None:
+    """Remove stale cache files older than max_age_seconds."""
+    if max_age_seconds is None:
+        max_age_seconds = max(TTL_NETWORK, TTL_RESULT) * 2
+    if not CACHE_DIR.exists():
+        return
+    now = time.time()
+    for path in CACHE_DIR.iterdir():
+        if path.is_file() and (now - path.stat().st_mtime) > max_age_seconds:
+            path.unlink(missing_ok=True)
 
 
 # --- Network cache (pickle, 24h) ---

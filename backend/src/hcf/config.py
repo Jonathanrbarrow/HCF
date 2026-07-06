@@ -5,7 +5,7 @@ All hardcoded values that were previously scattered across modules
 are centralised here. Override any value via environment variables
 (e.g. HCF_CACHE_DIR=".my_cache") or a .env file.
 """
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -33,11 +33,10 @@ class Settings(BaseSettings):
     # API
     max_segments_default: int = 200
     max_segments_limit: int = 1000
-    cors_origins: list[str] = ["*"]
+    # Production: set HCF_CORS_ORIGINS env var to your frontend domain(s)
+    cors_origins: list[str] = ["http://localhost:5173", "http://localhost:3000"]
 
-    class Config:
-        env_prefix = "HCF_"
-        env_file = ".env"
+    model_config = SettingsConfigDict(env_prefix="HCF_", env_file=".env")
 
 
 settings = Settings()

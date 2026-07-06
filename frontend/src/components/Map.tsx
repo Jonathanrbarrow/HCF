@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { renderToString } from 'react-dom/server';
 import { MapContainer, TileLayer, GeoJSON, useMap } from 'react-leaflet';
 import L from 'leaflet';
@@ -58,11 +58,11 @@ const ComfortMap: React.FC<ComfortMapProps> = ({
   selectedSegment,
 }) => {
   const mapRef = useRef<LeafletMap | null>(null);
-  const geoJsonKey = useRef(0);
+  const [geoJsonKey, setGeoJsonKey] = useState(0);
 
   // Bump key whenever data or weights change to force GeoJSON layer re-render
   useEffect(() => {
-    geoJsonKey.current += 1;
+    setGeoJsonKey((k) => k + 1);
   }, [data, wNoise, wCanopy, wHeat, wSafety]);
 
   // Fit bounds when data arrives
@@ -93,6 +93,10 @@ const ComfortMap: React.FC<ComfortMapProps> = ({
     if (!feature) return {};
     const f = feature as unknown as ComfortFeature;
     const { noise_dba, canopy_pct, heat_index, safety_score } = f.properties;
+    // Recompute score with user's current weights for ALL features.
+    // intervenedData only patches comfort_score for intervened segments;
+    // non-intervened segments retain the server-side score which may not
+    // reflect the current weight settings.
     const score = computeComfortScoreClient(noise_dba, canopy_pct, heat_index, safety_score, wNoise, wCanopy, wHeat, wSafety);
     const dq = f.properties.data_quality;
     const hasDefaults = dq ? Object.values(dq).some((v) => v !== 'real') : false;
@@ -119,8 +123,7 @@ const ComfortMap: React.FC<ComfortMapProps> = ({
     [wNoise, wCanopy, wHeat, wSafety],
   );
 
-  // Memoize the data key so GeoJSON only re-renders when data or weights actually change
-  const dataKey = useMemo(() => geoJsonKey.current, [data, wNoise, wCanopy, wHeat, wSafety]);
+
 
   return (
     <MapContainer
@@ -139,7 +142,7 @@ const ComfortMap: React.FC<ComfortMapProps> = ({
       />
       {data && (
         <GeoJSON
-          key={dataKey}
+          key={geoJsonKey}
           data={data}
           style={style}
           onEachFeature={onEachFeature}

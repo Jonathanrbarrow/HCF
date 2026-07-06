@@ -100,7 +100,7 @@ class TestNoiseDataFetch:
         non_null_guaranteed = [v for v in values_guaranteed if v is not None]
         assert len(non_null_guaranteed) >= 1, "Guaranteed noise bbox returned no noise data"
 
-    def test_noise_varies_between_cities(self, three_random_cities):
+    def test_noise_varies_between_cities(self):
         """
         QUESTION: Do different cities return different noise profiles?
 
@@ -124,7 +124,7 @@ class TestNoiseDataFetch:
 class TestNoiseDataQuality:
     """Are the noise values physically meaningful?"""
 
-    def test_noise_values_are_realistic(self, five_random_cities):
+    def test_noise_values_are_realistic(self):
         """
         QUESTION: Are noise values in the physically realistic range?
 

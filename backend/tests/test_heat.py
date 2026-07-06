@@ -19,6 +19,7 @@ import pytest
 from tests.cities import get_random_cities
 
 
+@pytest.mark.heat
 @pytest.mark.slow
 class TestHeatDataFetch:
     """Can we fetch real apparent temperature data from Open-Meteo?"""

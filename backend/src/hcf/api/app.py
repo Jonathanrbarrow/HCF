@@ -10,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
+from hcf import __version__
 from hcf.config import settings
 from hcf.api.routes import router
 
@@ -19,7 +20,7 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title="HCF — Human Comfort Factors",
         description="Walk comfort scoring API for US cities",
-        version="0.2.0",
+        version=__version__,
     )
 
     # CORS — allow the frontend to call the API
@@ -47,5 +48,7 @@ def create_app() -> FastAPI:
     return app
 
 
-# Module-level instance for `uvicorn hcf.api.app:app`
+# Module-level instance for `uvicorn hcf.api.app:app` (without --factory).
+# Note: If using `uvicorn hcf.api.app:create_app --factory`, the app
+# will be created twice. The project uses the non-factory pattern.
 app = create_app()

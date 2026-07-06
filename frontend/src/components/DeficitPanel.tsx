@@ -99,7 +99,7 @@ const DeficitPanel: React.FC<DeficitPanelProps> = ({
       lat = line[midIdx][1];
     }
 
-    if (lat && lon) {
+    if (lat !== 0 || lon !== 0) {
       onSelectSegment(lat, lon, { ...f.properties, comfort_score: score });
     }
   };
@@ -118,12 +118,16 @@ const DeficitPanel: React.FC<DeficitPanelProps> = ({
           const label = scoreToLabel(score);
           const name = feature.properties.street_name || 'Unnamed Path';
           const stressor = getPrimaryStressor(feature);
+          const segId = `${feature.properties.street_name}#${(feature.geometry as any).coordinates?.[0]?.[0]?.toFixed(5) ?? idx}`;
 
           return (
             <div
-              key={idx}
+              key={segId}
               className="deficit-item"
+              role="button"
+              tabIndex={0}
               onClick={() => handleItemClick(feature, score)}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleItemClick(feature, score); } }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                 <span className="street-title">{name}</span>

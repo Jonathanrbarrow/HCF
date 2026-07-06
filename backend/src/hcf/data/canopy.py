@@ -20,11 +20,14 @@ QuadKey tile system:
   The dataset uses Bing Maps QuadKey tiling. We compute the QuadKey
   directly from lat/lon using the standard algorithm, no index file needed.
 """
+import logging
 import math
 import os
 import requests
 
 from hcf.config import settings
+
+logger = logging.getLogger(__name__)
 
 # We try rasterio first (for direct COG reads from S3).
 # If not available, fall back to HTTP range requests.
@@ -193,7 +196,6 @@ def _batch_read_tile(
     env_kwargs = {}
     try:
         import boto3
-        from botocore import UNSIGNED  # noqa: F811
         from botocore.config import Config as BotoConfig  # noqa: F811
         session = boto3.Session()
         aws_session = AWSSession(session, aws_unsigned=True)
@@ -230,7 +232,6 @@ def _fetch_via_rasterio(lat: float, lon: float, quadkey: str) -> float | None:
         env_kwargs = {}
         # Configure anonymous S3 access
         import boto3
-        from botocore import UNSIGNED
         from botocore.config import Config as BotoConfig
         session = boto3.Session()
         aws_session = AWSSession(session, aws_unsigned=True)
@@ -285,6 +286,11 @@ def _fetch_via_http(lat: float, lon: float, quadkey: str) -> float | None:
             # the exact pixel without rasterio. Return a sentinel that
             # indicates "data available but value unknown".
             # The pipeline should handle this gracefully.
+            logger.warning(
+                "Canopy tile exists for quadkey %s but cannot be read "
+                "without rasterio. Install rasterio for actual canopy data.",
+                quadkey,
+            )
             return None  # TODO: implement HTTP range-based COG reading
         else:
             return None
