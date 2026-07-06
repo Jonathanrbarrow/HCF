@@ -11,17 +11,19 @@ Traditional walkability metrics (e.g., Walk Score) measure **proximity** — how
 
 ## The Solution
 
-Score every walkable street segment in a US city on a **0–100 Comfort Scale** by layering environmental stressors — heat, noise, and shade — on top of the pedestrian network. Deliver results through a lightweight browser frontend as a color-coded interactive map designed for urban planning and corridor-level spatial analysis.
+Score every walkable street segment in a US city on a **0–100 Comfort Scale** by layering environmental stressors — heat, noise, shade, safety, and traffic — on top of the pedestrian network. Deliver results through a lightweight browser frontend as a color-coded interactive map designed for urban planning, corridor-level spatial analysis, and **intervention modeling** ("what happens to comfort when we change the street?").
 
 **Scoring formula:**
 
 ```
-Comfort Score = 100 - [(wH × Heat_Penalty) + (wN × Noise_Penalty) + (wS × Shade_Penalty)]
+Comfort Score = 100 - [(wH × Heat_Penalty) + (wN × Noise_Penalty) + (wC × Canopy_Penalty)
+                       + (wS × Safety_Penalty) + (wT × Traffic_Penalty) + (wA × AQI_Penalty)]
 ```
 
 - All penalties normalized to 0.0–1.0 against human comfort thresholds
-- Weights (w) are adjustable by the user
+- Weights (w) are adjustable by the user; auto-normalize when factors are disabled
 - Scored per street segment (vector road centerlines) for precise block-by-block planning audits
+- **All data is historical/static** — results are reproducible regardless of query time
 
 
 ---
@@ -53,31 +55,46 @@ Comfort Score = 100 - [(wH × Heat_Penalty) + (wN × Noise_Penalty) + (wS × Sha
 ### Phase 1 — Vertical Slice (MVP)
 > Goal: Colored lines on a map from real data, proven across multiple cities.
 
-- [ ] Validate that `osmnx` + `geopandas` install and run on the dev environment
-- [ ] Validate at least one environmental data source API (noise or heat) returns usable street-level data for multiple US cities
-- [ ] Backend: Fetch pedestrian network for a given US city via OSMnx (city-agnostic — no hardcoded coordinates)
-- [ ] Backend: Fetch environmental data and spatial-join to street segments
-- [ ] Backend: Compute comfort score per segment
-- [ ] Frontend: Render scored segments as colored lines on an interactive map
-- [ ] End-to-end: User types a city name → sees scored map
-- [ ] **Scalability gate: Verify end-to-end works for at least 3 different cities before moving to Phase 2**
+- [x] Validate that `osmnx` + `geopandas` install and run on the dev environment
+- [x] Validate at least one environmental data source API (noise or heat) returns usable street-level data for multiple US cities
+- [x] Backend: Fetch pedestrian network for a given US city via OSMnx (city-agnostic — no hardcoded coordinates)
+- [x] Backend: Fetch environmental data and spatial-join to street segments
+- [x] Backend: Compute comfort score per segment
+- [x] Frontend: Render scored segments as colored lines on an interactive map
+- [x] End-to-end: User types a city name → sees scored map
+- [x] **Scalability gate: Verify end-to-end works for at least 3 different cities before moving to Phase 2**
 
 ### Phase 2 — Multi-Factor & Polish
 > Goal: Multiple data layers, user controls, production-ready.
 
-- [ ] Add second environmental data source
-- [ ] User-adjustable weight sliders in the UI
-- [ ] Data caching (avoid re-fetching on every request)
-- [ ] Error handling and loading states
+- [x] Add second environmental data source (canopy height)
+- [x] Add third environmental data source (heat — historical summer peak averages)
+- [x] User-adjustable weight sliders in the UI
+- [x] Data caching (network 24h, results 30d)
+- [x] Error handling and loading states
 - [ ] Mobile-responsive layout
 
 ### Phase 3 — Scale & Extend
 > Goal: Power-user features and broader adoption.
 
-- [ ] Deficit Analysis (highlighting and listing streets with highest environmental stress)
-- [ ] Exportable reports (PDF/image for planner presentations)
+- [x] Deficit Analysis (highlighting and listing streets with highest environmental stress)
+- [x] Exportable reports (PDF via browser print, GeoJSON + CSV data export)
 - [ ] Comparison mode (side-by-side cities or before/after scenarios)
-- [ ] Additional data layers (air quality, safety/sidewalk width)
+- [x] Additional data layers (safety from OSM, traffic volume AADT, AQI ready but disabled)
+- [x] Scenario modeling workbench (interventions: tree planting, noise barriers, cool pavement, shade structures, traffic calming, sidewalk upgrades)
+- [x] Cost estimation for proposed interventions
+- [x] Shareable URL state (city + weights encoded in URL params)
+- [x] Onboarding empty state with sample city quick-start
+
+### Phase 4 — Differentiation (Future)
+> Goal: Features that create defensible market position.
+
+- [ ] Neighborhood / district analysis (draw-a-rectangle, census tracts)
+- [ ] Professional PDF reports (structured layout, not browser print)
+- [ ] Public API for third-party integration
+- [ ] Equity dashboard (Census demographic overlay on comfort scores)
+- [ ] User accounts and saved projects
+- [ ] Historical trend tracking
 
 ---
 
@@ -121,8 +138,12 @@ The predecessor **worked for Gainesville, FL.** It had a polished frontend and p
 | 2026-07-02 | Refactor: Removed routing stubs to align with 'mapping for comfort' planning goal | `98046b9` |
 | 2026-07-02 | Feature: Implemented Deficit Analysis side panel to list high-stress corridors, map panning, and street name matching | `d1ff0ba` |
 | 2026-07-02 | Feature: Added Scenario Modeler, Safety factor, PDF Report exports, and released v0.3.0 | `7a2e8cc` |
-
-
-
-
+| 2026-07-06 | Feature: Traffic volume (AADT) as 5th comfort factor via FHWA HPMS ArcGIS REST API | — |
+| 2026-07-06 | Feature: All 5 comfort factors feature-toggleable via env vars for troubleshooting | — |
+| 2026-07-06 | Performance: Parallelized all API calls (ThreadPoolExecutor) — ~85s → ~12s per query | `7529f63` |
+| 2026-07-06 | UX: GeoJSON/CSV data export, onboarding empty state, URL state persistence (shareable links) | `7529f63` |
+| 2026-07-06 | Architecture: Switched heat from real-time to historical summer peak averages (3-year mean) | `c3e8259` |
+| 2026-07-06 | Architecture: Increased result cache TTL from 1h to 30d (all data is static/historical) | `c3e8259` |
+| 2026-07-06 | Feature: AQI factor (6th) added to engine, disabled by default (no street-level intervention model) | `c3e8259` |
+| 2026-07-06 | Feature: Expanded intervention workbench — heat cooling, traffic calming, cost estimation | `b8cc992` |
 
