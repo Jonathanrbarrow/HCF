@@ -27,9 +27,18 @@ export interface ComfortFeature {
   properties: ComfortProperties;
 }
 
+export interface ComfortMetadata {
+  place: string;
+  total_segments: number;
+  elapsed_seconds?: number;
+  from_cache?: boolean;
+  data_note?: string;
+}
+
 export interface ComfortGeoJSON {
   type: 'FeatureCollection';
   features: ComfortFeature[];
+  metadata?: ComfortMetadata;
 }
 
 export interface CityStats {

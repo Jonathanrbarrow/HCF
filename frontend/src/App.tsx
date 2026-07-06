@@ -74,7 +74,8 @@ const App: React.FC = () => {
     : error
       ? `Error: ${error}`
       : data
-        ? `${data.features.length} segments scored`
+        ? `${data.features.length} segments scored` +
+          (data.metadata?.from_cache ? ' (cached)' : data.metadata?.elapsed_seconds ? ` in ${data.metadata.elapsed_seconds}s` : '')
         : 'Ready';
 
   // Reset selected segment and active proposals when city changes
