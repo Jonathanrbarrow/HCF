@@ -313,7 +313,7 @@ const App: React.FC = () => {
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           {netGain > 0 && (
             <span style={{ fontSize: 11, fontWeight: 700, padding: '4px 8px', borderRadius: 6, backgroundColor: 'rgba(34,197,94,0.15)', color: '#22c55e', border: '1px solid rgba(34,197,94,0.3)' }}>
-              ✨ Scenario Gain: +{netGain.toFixed(2)} pts
+              ✨ Scenario: +{netGain.toFixed(1)} pts avg ({Object.keys(interventions).length} segment{Object.keys(interventions).length !== 1 ? 's' : ''})
             </span>
           )}
           <span id="status" className={statusClass}>
