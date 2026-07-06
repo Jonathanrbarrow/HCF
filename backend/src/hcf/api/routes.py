@@ -16,8 +16,18 @@ router = APIRouter()
 
 @router.get("/health")
 def health_check():
-    """Health check endpoint."""
-    return {"status": "ok", "version": __version__}
+    """Health check endpoint — also reports feature flag status."""
+    return {
+        "status": "ok",
+        "version": __version__,
+        "factors": {
+            "noise": settings.enable_noise_factor,
+            "canopy": settings.enable_canopy_factor,
+            "heat": settings.enable_heat_factor,
+            "safety": settings.enable_safety_factor,
+            "traffic": settings.enable_traffic_factor,
+        },
+    }
 
 
 @router.get("/api/v1/comfort")

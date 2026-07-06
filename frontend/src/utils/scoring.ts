@@ -22,6 +22,19 @@ const computeSafetyPenalty = (safetyScore: number | null): number => {
   return 1.0 - (s / 100.0);
 };
 
+const computeTrafficPenalty = (aadt: number | null): number => {
+  if (aadt === null) return 0.0;
+  if (aadt <= 1000) return 0.0;
+  if (aadt >= 30000) return 1.0;
+  return (aadt - 1000) / (30000 - 1000);
+};
+
+/**
+ * Compute comfort score client-side with user-adjustable weights.
+ *
+ * Any factor with a weight of 0 is excluded. When traffic data
+ * is null, its weight is automatically redistributed.
+ */
 export const computeComfortScoreClient = (
   noise: number | null,
   canopyPct: number | null,
@@ -30,21 +43,28 @@ export const computeComfortScoreClient = (
   wNoise: number,
   wCanopy: number,
   wHeat: number,
-  wSafety: number
+  wSafety: number,
+  trafficVolume: number | null = null,
+  wTraffic: number = 0,
 ): number => {
-  const pNoise = computeNoisePenalty(noise);
-  const pCanopy = computeCanopyPenalty(canopyPct);
-  const pHeat = computeHeatPenalty(heat);
-  const pSafety = computeSafetyPenalty(safetyScore);
+  // Build penalty/weight pairs — only include non-null factors with non-zero weight
+  const factors: { penalty: number; weight: number }[] = [];
 
-  const totalWeight = wNoise + wCanopy + wHeat + wSafety;
+  if (wNoise > 0) factors.push({ penalty: computeNoisePenalty(noise), weight: wNoise });
+  if (wCanopy > 0) factors.push({ penalty: computeCanopyPenalty(canopyPct), weight: wCanopy });
+  if (wHeat > 0) factors.push({ penalty: computeHeatPenalty(heat), weight: wHeat });
+  if (wSafety > 0) factors.push({ penalty: computeSafetyPenalty(safetyScore), weight: wSafety });
+  if (wTraffic > 0 && trafficVolume !== null) {
+    factors.push({ penalty: computeTrafficPenalty(trafficVolume), weight: wTraffic });
+  }
+
+  const totalWeight = factors.reduce((sum, f) => sum + f.weight, 0);
   if (totalWeight === 0) return 100;
 
-  const wn = wNoise / totalWeight;
-  const wc = wCanopy / totalWeight;
-  const wh = wHeat / totalWeight;
-  const ws = wSafety / totalWeight;
+  const totalPenalty = factors.reduce(
+    (sum, f) => sum + (f.weight / totalWeight) * f.penalty,
+    0,
+  ) * 100.0;
 
-  const totalPenalty = (wn * pNoise + wc * pCanopy + wh * pHeat + ws * pSafety) * 100.0;
   return Math.round(Math.max(0, Math.min(100, 100 - totalPenalty)));
 };

@@ -1,9 +1,10 @@
 /** GeoJSON feature properties returned by the HCF backend */
 export interface DataQuality {
-  noise: 'real' | 'default' | 'unavailable';
-  canopy: 'real' | 'default' | 'unavailable';
-  heat: 'real' | 'default' | 'unavailable' | 'fixed';
-  safety: 'real' | 'default' | 'unavailable';
+  noise: 'real' | 'default' | 'unavailable' | 'disabled';
+  canopy: 'real' | 'default' | 'unavailable' | 'disabled';
+  heat: 'real' | 'default' | 'unavailable' | 'fixed' | 'disabled';
+  safety: 'real' | 'default' | 'unavailable' | 'disabled';
+  traffic: 'real' | 'default' | 'unavailable' | 'disabled';
 }
 
 export interface ComfortProperties {
@@ -13,6 +14,7 @@ export interface ComfortProperties {
   canopy_pct: number | null;
   heat_index: number | null;
   safety_score: number | null;
+  traffic_volume: number | null;
   street_name: string;
   data_quality?: DataQuality;
 }

@@ -30,6 +30,18 @@ class Settings(BaseSettings):
     default_heat_index: float = 85.0
     heat_api_url: str = "https://api.open-meteo.com/v1/forecast"
 
+    # Traffic
+    traffic_api_url: str = "https://geo.dot.gov/server/rest/services/Hosted"
+    traffic_default_aadt: int = 5000
+
+    # Feature toggles — disable any factor for troubleshooting
+    # (set via env: HCF_ENABLE_NOISE_FACTOR=false, etc.)
+    enable_noise_factor: bool = True
+    enable_canopy_factor: bool = True
+    enable_heat_factor: bool = True
+    enable_safety_factor: bool = True
+    enable_traffic_factor: bool = True
+
     # API
     max_segments_default: int = 200
     max_segments_limit: int = 1000

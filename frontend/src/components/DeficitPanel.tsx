@@ -9,6 +9,7 @@ interface DeficitPanelProps {
   wCanopy: number;
   wHeat: number;
   wSafety: number;
+  wTraffic: number;
   onSelectSegment: (lat: number, lon: number, properties: any) => void;
 }
 
@@ -18,6 +19,7 @@ const DeficitPanel: React.FC<DeficitPanelProps> = ({
   wCanopy,
   wHeat,
   wSafety,
+  wTraffic,
   onSelectSegment,
 }) => {
   // Sort segments by comfort score (ascending - worst first) and pick top 10
@@ -25,7 +27,7 @@ const DeficitPanel: React.FC<DeficitPanelProps> = ({
     if (!data || data.features.length === 0) return [];
 
     const scoredFeatures = data.features.map((f) => {
-      const { noise_dba, canopy_pct, heat_index, safety_score } = f.properties;
+      const { noise_dba, canopy_pct, heat_index, safety_score, traffic_volume } = f.properties;
       const score = computeComfortScoreClient(
         noise_dba,
         canopy_pct,
@@ -35,6 +37,8 @@ const DeficitPanel: React.FC<DeficitPanelProps> = ({
         wCanopy,
         wHeat,
         wSafety,
+        traffic_volume,
+        wTraffic,
       );
       return {
         feature: f,
@@ -47,24 +51,26 @@ const DeficitPanel: React.FC<DeficitPanelProps> = ({
 
     // Pick top 10
     return scoredFeatures.slice(0, 10);
-  }, [data, wNoise, wCanopy, wHeat, wSafety]);
+  }, [data, wNoise, wCanopy, wHeat, wSafety, wTraffic]);
 
   // Identify the primary environmental stressor for a segment
   const getPrimaryStressor = (f: ComfortFeature) => {
-    const { noise_dba, canopy_pct, heat_index, safety_score } = f.properties;
+    const { noise_dba, canopy_pct, heat_index, safety_score, traffic_volume } = f.properties;
 
     // Normalize penalties to see which is highest
     const noisePenalty = noise_dba !== null ? Math.max(0, (noise_dba - 45) / 35) : 0.14;
     const canopyPenalty = 1.0 - ((canopy_pct !== null ? canopy_pct : 20.0) / 100.0);
     const heatPenalty = heat_index !== null ? Math.max(0, (heat_index - 75) / 35) : 0.28;
     const safetyPenalty = 1.0 - ((safety_score !== null ? safety_score : 100.0) / 100.0);
+    const trafficPenalty = traffic_volume !== null ? Math.max(0, (traffic_volume - 1000) / 29000) : 0;
 
     const weightedNoise = noisePenalty * wNoise;
     const weightedCanopy = canopyPenalty * wCanopy;
     const weightedHeat = heatPenalty * wHeat;
     const weightedSafety = safetyPenalty * wSafety;
+    const weightedTraffic = trafficPenalty * wTraffic;
 
-    const maxPenalty = Math.max(weightedNoise, weightedCanopy, weightedHeat, weightedSafety);
+    const maxPenalty = Math.max(weightedNoise, weightedCanopy, weightedHeat, weightedSafety, weightedTraffic);
 
     if (maxPenalty === weightedNoise && noise_dba !== null) {
       return `🔊 Noise: ${noise_dba.toFixed(0)} dBA`;
@@ -77,6 +83,9 @@ const DeficitPanel: React.FC<DeficitPanelProps> = ({
     }
     if (maxPenalty === weightedSafety && safety_score !== null) {
       return `🛡️ Safety: ${safety_score.toFixed(0)}/100`;
+    }
+    if (maxPenalty === weightedTraffic && traffic_volume !== null) {
+      return `🚗 Traffic: ${traffic_volume.toLocaleString()} AADT`;
     }
     return 'Multiple stressors';
   };

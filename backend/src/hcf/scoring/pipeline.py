@@ -23,6 +23,7 @@ from hcf.data.network import fetch_walk_network, network_to_geodataframe
 from hcf.data.noise import fetch_noise_batch
 from hcf.data.canopy import fetch_canopy_batch, height_to_cover_pct
 from hcf.data.heat import fetch_heat_batch
+from hcf.data.traffic import fetch_traffic_batch
 from hcf.scoring.engine import compute_comfort_score
 from hcf.cache.store import (
     get_network_cache, set_network_cache,
@@ -67,16 +68,30 @@ def score_city_segments(place_query: str, max_segments: int = 500) -> gpd.GeoDat
         midpoint = row.geometry.interpolate(0.5, normalized=True)
         midpoints.append((midpoint.y, midpoint.x))
 
-    # Step 3: Batch fetch environmental data
-    noise_results = fetch_noise_batch(midpoints)
-    canopy_results = fetch_canopy_batch(midpoints)
-    heat_results = fetch_heat_batch(midpoints)
+    # Step 3: Batch fetch environmental data (respecting feature flags)
+    if settings.enable_noise_factor:
+        noise_results = fetch_noise_batch(midpoints)
+    else:
+        noise_results = [{"value": None, "quality": "disabled"} for _ in midpoints]
+
+    if settings.enable_canopy_factor:
+        canopy_results = fetch_canopy_batch(midpoints)
+    else:
+        canopy_results = [{"value": None, "quality": "disabled"} for _ in midpoints]
+
+    if settings.enable_heat_factor:
+        heat_results = fetch_heat_batch(midpoints)
+    else:
+        heat_results = [{"value": None, "quality": "disabled"} for _ in midpoints]
+
+    traffic_results = fetch_traffic_batch(midpoints)  # internally checks its own flag
 
     # Step 4: Assemble columns
     edges = edges.copy()
     edges["noise_dba"] = [r["value"] for r in noise_results]
     edges["canopy_height_m"] = [r["value"] for r in canopy_results]
     edges["heat_index"] = [r["value"] for r in heat_results]
+    edges["traffic_volume"] = [r["value"] for r in traffic_results]
 
     # Extract street name safely
     if "name" in edges.columns:
@@ -180,30 +195,41 @@ def score_city_segments(place_query: str, max_segments: int = 500) -> gpd.GeoDat
             "noise": noise_results[i]["quality"],
             "canopy": canopy_results[i]["quality"],
             "heat": heat_results[i]["quality"],
-            "safety": "real" if has_real_safety else "default"
+            "safety": "real" if has_real_safety else "default",
+            "traffic": traffic_results[i]["quality"],
         })
     edges["data_quality"] = data_qualities
 
-    # Step 5: Compute comfort scores
+    # Step 5: Compute comfort scores (disabled factors pass None → auto-excluded)
     scores = []
     for _, row in edges.iterrows():
-        noise = row["noise_dba"] if pd.notna(row["noise_dba"]) else settings.noise_default_dba
-        canopy = row["canopy_pct"]
-        heat = row["heat_index"] if pd.notna(row["heat_index"]) else settings.default_heat_index
-        safety = row["safety_score"]
+        noise = row["noise_dba"] if pd.notna(row["noise_dba"]) else (
+            settings.noise_default_dba if settings.enable_noise_factor else None
+        )
+        canopy = row["canopy_pct"] if settings.enable_canopy_factor else None
+        heat = row["heat_index"] if pd.notna(row["heat_index"]) else (
+            settings.default_heat_index if settings.enable_heat_factor else None
+        )
+        safety = row["safety_score"] if settings.enable_safety_factor else None
+        traffic = row["traffic_volume"] if pd.notna(row.get("traffic_volume")) else (
+            None  # engine handles None → excluded
+        )
 
         score = compute_comfort_score(
             noise_dba=noise,
             canopy_pct=canopy,
             heat_index=heat,
             safety_score=safety,
+            traffic_volume=traffic,
         )
         scores.append(score)
 
     edges["comfort_score"] = scores
 
     return edges[["geometry", "comfort_score", "noise_dba",
-                   "canopy_height_m", "canopy_pct", "heat_index", "safety_score", "street_name", "data_quality"]]
+                   "canopy_height_m", "canopy_pct", "heat_index",
+                   "safety_score", "traffic_volume",
+                   "street_name", "data_quality"]]
 
 
 def generate_comfort_geojson(place_query: str, max_segments: int = 200) -> dict:
@@ -238,6 +264,7 @@ def generate_comfort_geojson(place_query: str, max_segments: int = 200) -> dict:
                 "canopy_pct": row["canopy_pct"],
                 "heat_index": row["heat_index"],
                 "safety_score": row["safety_score"],
+                "traffic_volume": row["traffic_volume"],
                 "street_name": row["street_name"],
                 "data_quality": row["data_quality"],
             },

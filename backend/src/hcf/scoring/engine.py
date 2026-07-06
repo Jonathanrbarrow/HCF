@@ -3,19 +3,23 @@ Scoring module — computes Comfort Scores from environmental data.
 
 Formula:
   Comfort Score = 100 - [(wN × Noise_Penalty) + (wC × Canopy_Penalty)
-                         + (wH × Heat_Penalty) + (wS × Safety_Penalty)]
+                         + (wH × Heat_Penalty) + (wS × Safety_Penalty)
+                         + (wT × Traffic_Penalty)]
 
 Each penalty is normalized to 0.0 - 1.0.
-Weights default to equal (1/4 each) and are user-adjustable.
+Weights default to equal (1/5 each) and are user-adjustable.
+Traffic is feature-flagged — when traffic_volume is None, its weight
+is excluded and the remaining weights auto-normalize.
 Score is always clamped to [0, 100].
 """
 
-# Default weights — equal importance (1/4 each)
+# Default weights — equal importance (1/5 each)
 DEFAULT_WEIGHTS = {
-    "noise": 0.25,
-    "canopy": 0.25,
-    "heat": 0.25,
-    "safety": 0.25,
+    "noise": 0.20,
+    "canopy": 0.20,
+    "heat": 0.20,
+    "safety": 0.20,
+    "traffic": 0.20,
 }
 
 # Maximum total penalty (sum of weighted penalties is scaled to this)
@@ -82,29 +86,70 @@ def _safety_penalty(safety_score: float) -> float:
     return 1.0 - (safety_score / 100.0)
 
 
+def _traffic_penalty(aadt: float) -> float:
+    """
+    Convert traffic volume (AADT) to penalty (0.0 - 1.0).
+
+    Thresholds based on FHWA road classification volumes:
+    - <= 1000 AADT: 0.0 (quiet local/residential)
+    - >= 30000 AADT: 1.0 (major arterial / highway)
+    - Linear interpolation between
+    """
+    aadt = max(0.0, float(aadt))
+    if aadt <= 1000.0:
+        return 0.0
+    elif aadt >= 30000.0:
+        return 1.0
+    else:
+        return (aadt - 1000.0) / (30000.0 - 1000.0)
+
+
 def compute_comfort_score(
-    noise_dba: float = 0.0,
-    canopy_pct: float = 100.0,
-    heat_index: float = 70.0,
-    safety_score: float = 100.0,
+    noise_dba: float | None = 0.0,
+    canopy_pct: float | None = 100.0,
+    heat_index: float | None = 70.0,
+    safety_score: float | None = 100.0,
+    traffic_volume: float | None = None,
     weights: dict | None = None,
 ) -> float:
     """
     Compute a comfort score (0-100) from environmental inputs.
 
+    Any factor set to None is excluded from scoring — its weight is
+    removed and the remaining weights auto-normalize. This enables
+    per-factor feature toggles for troubleshooting.
+
     Args:
-        noise_dba: Noise level in dBA (0+)
-        canopy_pct: Tree canopy cover percentage (0-100)
-        heat_index: Heat index in °F
-        safety_score: Road pedestrian safety score (0-100)
-        weights: Optional dict with keys "noise", "canopy", "heat", "safety".
-                 Values are relative weights (will be normalized to sum to 1.0).
+        noise_dba: Noise level in dBA (0+), or None to exclude
+        canopy_pct: Tree canopy cover percentage (0-100), or None to exclude
+        heat_index: Heat index in °F, or None to exclude
+        safety_score: Road pedestrian safety score (0-100), or None to exclude
+        traffic_volume: AADT, or None to exclude
+        weights: Optional dict with keys "noise", "canopy", "heat",
+                 "safety", "traffic". Values are relative weights
+                 (will be normalized to sum to 1.0).
                  Defaults to equal weights.
 
     Returns:
         float: Comfort score between 0.0 and 100.0
     """
     w = weights if weights is not None else DEFAULT_WEIGHTS.copy()
+
+    # Build penalty map — only include enabled (non-None) factors
+    penalties: dict[str, float] = {}
+    if noise_dba is not None:
+        penalties["noise"] = _noise_penalty(noise_dba)
+    if canopy_pct is not None:
+        penalties["canopy"] = _canopy_penalty(canopy_pct)
+    if heat_index is not None:
+        penalties["heat"] = _heat_penalty(heat_index)
+    if safety_score is not None:
+        penalties["safety"] = _safety_penalty(safety_score)
+    if traffic_volume is not None:
+        penalties["traffic"] = _traffic_penalty(traffic_volume)
+
+    # Strip weights for disabled factors
+    w = {k: v for k, v in w.items() if k in penalties}
 
     # Normalize weights to sum to 1.0 (unless all zero)
     total_weight = sum(w.values())
@@ -115,12 +160,7 @@ def compute_comfort_score(
         return 100.0
 
     # Compute weighted penalty
-    penalty = (
-        w.get("noise", 0.0) * _noise_penalty(noise_dba)
-        + w.get("canopy", 0.0) * _canopy_penalty(canopy_pct)
-        + w.get("heat", 0.0) * _heat_penalty(heat_index)
-        + w.get("safety", 0.0) * _safety_penalty(safety_score)
-    )
+    penalty = sum(w.get(k, 0.0) * p for k, p in penalties.items())
 
     # Score = 100 minus penalty scaled to 100
     score = 100.0 - (penalty * MAX_PENALTY)

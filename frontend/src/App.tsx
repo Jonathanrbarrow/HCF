@@ -26,11 +26,15 @@ const getSegmentId = (f: ComfortFeature): string => {
 const App: React.FC = () => {
   const { data, loading, error, analyze } = useComfortData();
 
-  // Weight states (default to equal weights, i.e. 25% each)
-  const [wNoise, setWNoise] = useState(25);
-  const [wCanopy, setWCanopy] = useState(25);
-  const [wHeat, setWHeat] = useState(25);
-  const [wSafety, setWSafety] = useState(25);
+  // Weight states (default to equal weights, i.e. 20% each)
+  const [wNoise, setWNoise] = useState(20);
+  const [wCanopy, setWCanopy] = useState(20);
+  const [wHeat, setWHeat] = useState(20);
+  const [wSafety, setWSafety] = useState(20);
+  const [wTraffic, setWTraffic] = useState(20);
+
+  // Detect if traffic data is present (feature-flagged on backend)
+  const hasTraffic = data?.features.some((f) => f.properties.traffic_volume !== null) ?? false;
 
   // Active highlighted segment for workbench
   const [selectedSegment, setSelectedSegment] = useState<{
@@ -110,14 +114,16 @@ const App: React.FC = () => {
             wNoise,
             wCanopy,
             wHeat,
-            wSafety
+            wSafety,
+            props.traffic_volume,
+            wTraffic,
           );
           return { ...f, properties: props };
         }
         return f;
       }),
     };
-  }, [data, interventions, wNoise, wCanopy, wHeat, wSafety]);
+  }, [data, interventions, wNoise, wCanopy, wHeat, wSafety, wTraffic]);
 
   // Dynamically compute stats based on active weights and active interventions
   const adjustedStats = useMemo(() => {
@@ -125,7 +131,7 @@ const App: React.FC = () => {
     
     // Baseline stats
     const baselineScores = data.features.map((f) => {
-      const { noise_dba, canopy_pct, heat_index, safety_score } = f.properties;
+      const { noise_dba, canopy_pct, heat_index, safety_score, traffic_volume } = f.properties;
       return computeComfortScoreClient(
         noise_dba,
         canopy_pct,
@@ -134,7 +140,9 @@ const App: React.FC = () => {
         wNoise,
         wCanopy,
         wHeat,
-        wSafety
+        wSafety,
+        traffic_volume,
+        wTraffic,
       );
     });
 
@@ -155,7 +163,9 @@ const App: React.FC = () => {
         wNoise,
         wCanopy,
         wHeat,
-        wSafety
+        wSafety,
+        f.properties.traffic_volume,
+        wTraffic,
       );
     });
 
@@ -169,7 +179,7 @@ const App: React.FC = () => {
       max: proposedScores.reduce((a, b) => Math.max(a, b), -Infinity),
       baselineAvg: sumBaseline / baselineScores.length,
     };
-  }, [data, interventions, wNoise, wCanopy, wHeat, wSafety]);
+  }, [data, interventions, wNoise, wCanopy, wHeat, wSafety, wTraffic]);
 
   // Net gain from scenario modeling
   const netGain = adjustedStats
@@ -240,6 +250,19 @@ const App: React.FC = () => {
               aria-label="Safety weight"
             />
           </div>
+          {hasTraffic && (
+            <div className="slider-group">
+              <label>🚗 Traffic Weight: {wTraffic}%</label>
+              <input
+                type="range"
+                min="0"
+                max="100"
+                value={wTraffic}
+                onChange={(e) => setWTraffic(Number(e.target.value))}
+                aria-label="Traffic weight"
+              />
+            </div>
+          )}
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -261,6 +284,7 @@ const App: React.FC = () => {
           wCanopy={wCanopy}
           wHeat={wHeat}
           wSafety={wSafety}
+          wTraffic={wTraffic}
           selectedSegment={selectedSegment}
         />
         <DeficitPanel
@@ -269,6 +293,7 @@ const App: React.FC = () => {
           wCanopy={wCanopy}
           wHeat={wHeat}
           wSafety={wSafety}
+          wTraffic={wTraffic}
           onSelectSegment={(lat, lon, properties) => {
             const f = { geometry: { type: 'LineString' as const, coordinates: [[lon, lat]] }, properties } as ComfortFeature;
             const id = getSegmentId(f);
