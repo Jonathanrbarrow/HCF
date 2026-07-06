@@ -113,8 +113,8 @@ def fetch_noise_batch(points: list[tuple[float, float]]) -> list[dict]:
     """
     Fetch noise levels for a batch of points with quality tracking.
 
-    Calls fetch_noise_at_point() per point (true batching via ArcGIS
-    multi-point identify is a future optimization).
+    Calls fetch_noise_at_point() per point using a thread pool for
+    concurrent execution.
 
     Args:
         points: List of (lat, lon) tuples.
@@ -124,19 +124,30 @@ def fetch_noise_batch(points: list[tuple[float, float]]) -> list[dict]:
           - "value": float or None
           - "quality": "real" | "default" | "unavailable"
     """
-    # TODO: Use concurrent.futures.ThreadPoolExecutor for parallel requests.
-    # Sequential fetching is slow for large segment counts (200+ serial HTTP calls).
-    results = []
-    for lat, lon in points:
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    def _fetch_one(idx_lat_lon: tuple[int, tuple[float, float]]) -> tuple[int, dict]:
+        idx, (lat, lon) = idx_lat_lon
         try:
             value = fetch_noise_at_point(lat, lon)
             if value is not None:
-                results.append({"value": value, "quality": "real"})
+                return idx, {"value": value, "quality": "real"}
             else:
-                results.append({"value": settings.noise_default_dba, "quality": "default"})
+                return idx, {"value": settings.noise_default_dba, "quality": "default"}
         except Exception:
-            results.append({"value": None, "quality": "unavailable"})
-    return results
+            return idx, {"value": None, "quality": "unavailable"}
+
+    results: list[dict | None] = [None] * len(points)
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        futures = {
+            executor.submit(_fetch_one, (i, pt)): i
+            for i, pt in enumerate(points)
+        }
+        for future in as_completed(futures):
+            idx, result = future.result()
+            results[idx] = result
+
+    return results  # type: ignore[return-value]
 
 
 def fetch_noise_for_bbox(bbox: tuple, sample_points: int = 25) -> list:

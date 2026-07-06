@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import type { ComfortProperties } from './types/comfort';
 import SearchBar from './components/SearchBar';
 import ComfortMap from './components/Map';
@@ -6,6 +6,7 @@ import Legend from './components/Legend';
 import StatsBar from './components/StatsBar';
 import DeficitPanel from './components/DeficitPanel';
 import InterventionCard from './components/InterventionCard';
+import EmptyState from './components/EmptyState';
 import { useComfortData } from './hooks/useComfortData';
 import { computeComfortScoreClient } from './utils/scoring';
 import type { ComfortFeature } from './types/comfort';
@@ -26,12 +27,30 @@ const getSegmentId = (f: ComfortFeature): string => {
 const App: React.FC = () => {
   const { data, loading, error, analyze } = useComfortData();
 
+  // Track the last analyzed city for URL persistence
+  const [currentCity, setCurrentCity] = useState<string | null>(null);
+  const initializedRef = useRef(false);
+
+  // Read initial values from URL params
+  const initialParams = useMemo(() => {
+    const sp = new URLSearchParams(window.location.search);
+    return {
+      city: sp.get('city'),
+      wNoise: sp.has('wNoise') ? Number(sp.get('wNoise')) : 20,
+      wCanopy: sp.has('wCanopy') ? Number(sp.get('wCanopy')) : 20,
+      wHeat: sp.has('wHeat') ? Number(sp.get('wHeat')) : 20,
+      wSafety: sp.has('wSafety') ? Number(sp.get('wSafety')) : 20,
+      wTraffic: sp.has('wTraffic') ? Number(sp.get('wTraffic')) : 20,
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Weight states (default to equal weights, i.e. 20% each)
-  const [wNoise, setWNoise] = useState(20);
-  const [wCanopy, setWCanopy] = useState(20);
-  const [wHeat, setWHeat] = useState(20);
-  const [wSafety, setWSafety] = useState(20);
-  const [wTraffic, setWTraffic] = useState(20);
+  const [wNoise, setWNoise] = useState(initialParams.wNoise);
+  const [wCanopy, setWCanopy] = useState(initialParams.wCanopy);
+  const [wHeat, setWHeat] = useState(initialParams.wHeat);
+  const [wSafety, setWSafety] = useState(initialParams.wSafety);
+  const [wTraffic, setWTraffic] = useState(initialParams.wTraffic);
 
   // Detect if traffic data is present (feature-flagged on backend)
   const hasTraffic = data?.features.some((f) => f.properties.traffic_volume !== null) ?? false;
@@ -62,8 +81,32 @@ const App: React.FC = () => {
   const handleSearch = (city: string) => {
     setSelectedSegment(null);
     setInterventions({});
+    setCurrentCity(city);
     analyze(city);
   };
+
+  // Task 3: Auto-analyze from URL on mount
+  useEffect(() => {
+    if (initializedRef.current) return;
+    initializedRef.current = true;
+    if (initialParams.city) {
+      setCurrentCity(initialParams.city);
+      analyze(initialParams.city);
+    }
+  }, [initialParams.city, analyze]);
+
+  // Task 3: Update URL when city loads or weights change
+  useEffect(() => {
+    if (!currentCity) return;
+    const sp = new URLSearchParams();
+    sp.set('city', currentCity);
+    sp.set('wNoise', String(wNoise));
+    sp.set('wCanopy', String(wCanopy));
+    sp.set('wHeat', String(wHeat));
+    sp.set('wSafety', String(wSafety));
+    sp.set('wTraffic', String(wTraffic));
+    window.history.replaceState(null, '', '?' + sp.toString());
+  }, [currentCity, wNoise, wCanopy, wHeat, wSafety, wTraffic]);
 
   // Safe handler to update overrides
   const handleUpdateIntervention = (
@@ -306,8 +349,11 @@ const App: React.FC = () => {
           onUpdateIntervention={handleUpdateIntervention}
           onClose={() => setSelectedSegment(null)}
         />
+        {!data && !loading && !error && (
+          <EmptyState onSelectCity={handleSearch} />
+        )}
       </div>
-      <StatsBar stats={adjustedStats} />
+      <StatsBar stats={adjustedStats} data={intervenedData} />
       <Legend />
 
       {loading && (

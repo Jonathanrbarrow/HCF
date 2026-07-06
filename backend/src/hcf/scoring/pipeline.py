@@ -68,23 +68,37 @@ def score_city_segments(place_query: str, max_segments: int = 500) -> gpd.GeoDat
         midpoint = row.geometry.interpolate(0.5, normalized=True)
         midpoints.append((midpoint.y, midpoint.x))
 
-    # Step 3: Batch fetch environmental data (respecting feature flags)
-    if settings.enable_noise_factor:
-        noise_results = fetch_noise_batch(midpoints)
-    else:
-        noise_results = [{"value": None, "quality": "disabled"} for _ in midpoints]
+    # Step 3: Batch fetch environmental data concurrently (respecting feature flags)
+    from concurrent.futures import ThreadPoolExecutor
 
-    if settings.enable_canopy_factor:
-        canopy_results = fetch_canopy_batch(midpoints)
-    else:
-        canopy_results = [{"value": None, "quality": "disabled"} for _ in midpoints]
+    def _get_noise():
+        if settings.enable_noise_factor:
+            return fetch_noise_batch(midpoints)
+        return [{"value": None, "quality": "disabled"} for _ in midpoints]
 
-    if settings.enable_heat_factor:
-        heat_results = fetch_heat_batch(midpoints)
-    else:
-        heat_results = [{"value": None, "quality": "disabled"} for _ in midpoints]
+    def _get_canopy():
+        if settings.enable_canopy_factor:
+            return fetch_canopy_batch(midpoints)
+        return [{"value": None, "quality": "disabled"} for _ in midpoints]
 
-    traffic_results = fetch_traffic_batch(midpoints)  # internally checks its own flag
+    def _get_heat():
+        if settings.enable_heat_factor:
+            return fetch_heat_batch(midpoints)
+        return [{"value": None, "quality": "disabled"} for _ in midpoints]
+
+    def _get_traffic():
+        return fetch_traffic_batch(midpoints)  # internally checks its own flag
+
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        noise_future = executor.submit(_get_noise)
+        canopy_future = executor.submit(_get_canopy)
+        heat_future = executor.submit(_get_heat)
+        traffic_future = executor.submit(_get_traffic)
+
+        noise_results = noise_future.result()
+        canopy_results = canopy_future.result()
+        heat_results = heat_future.result()
+        traffic_results = traffic_future.result()
 
     # Step 4: Assemble columns
     edges = edges.copy()

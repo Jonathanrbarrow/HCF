@@ -203,21 +203,36 @@ def fetch_traffic_batch(
     if not settings.enable_traffic_factor:
         return [{"value": None, "quality": "disabled"} for _ in points]
 
-    # Resolve state from first point if not provided
+    # Resolve state from first point if not provided (single call)
     if state_abbr is None and points:
         state_abbr = _resolve_state(points[0][0], points[0][1])
 
-    results = []
-    for lat, lon in points:
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    resolved_state = state_abbr  # capture for closure
+
+    def _fetch_one(idx_lat_lon: tuple[int, tuple[float, float]]) -> tuple[int, dict]:
+        idx, (lat, lon) = idx_lat_lon
         try:
-            value = fetch_traffic_at_point(lat, lon, state_abbr=state_abbr)
+            value = fetch_traffic_at_point(lat, lon, state_abbr=resolved_state)
             if value is not None:
-                results.append({"value": value, "quality": "real"})
+                return idx, {"value": value, "quality": "real"}
             else:
-                results.append({
+                return idx, {
                     "value": settings.traffic_default_aadt,
                     "quality": "default",
-                })
+                }
         except Exception:
-            results.append({"value": None, "quality": "unavailable"})
-    return results
+            return idx, {"value": None, "quality": "unavailable"}
+
+    results: list[dict | None] = [None] * len(points)
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        futures = {
+            executor.submit(_fetch_one, (i, pt)): i
+            for i, pt in enumerate(points)
+        }
+        for future in as_completed(futures):
+            idx, result = future.result()
+            results[idx] = result
+
+    return results  # type: ignore[return-value]
