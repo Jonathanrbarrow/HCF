@@ -13,8 +13,16 @@ interface InterventionCardProps {
     canopy_pct?: number;
     noise_dba?: number;
     safety_score?: number;
+    heat_index?: number;
+    traffic_volume?: number;
   } | undefined;
-  onUpdateIntervention: (id: string, updates: { canopy_pct?: number; noise_dba?: number; safety_score?: number } | null) => void;
+  onUpdateIntervention: (id: string, updates: {
+    canopy_pct?: number;
+    noise_dba?: number;
+    safety_score?: number;
+    heat_index?: number;
+    traffic_volume?: number;
+  } | null) => void;
   onClose: () => void;
 }
 
@@ -26,12 +34,14 @@ const InterventionCard: React.FC<InterventionCardProps> = ({
 }) => {
   if (!segment) return null;
 
-  const { street_name, noise_dba, canopy_pct, safety_score, comfort_score } = segment.properties;
+  const { street_name, noise_dba, canopy_pct, safety_score, heat_index, traffic_volume, comfort_score } = segment.properties;
 
   // Active values (either proposed or original)
   const activeCanopy = intervention?.canopy_pct !== undefined ? intervention.canopy_pct : (canopy_pct ?? 20);
   const activeNoise = intervention?.noise_dba !== undefined ? intervention.noise_dba : (noise_dba ?? 65);
   const activeSafety = intervention?.safety_score !== undefined ? intervention.safety_score : (safety_score ?? 70);
+  const activeHeat = intervention?.heat_index !== undefined ? intervention.heat_index : (heat_index ?? 85);
+  const activeTraffic = intervention?.traffic_volume !== undefined ? intervention.traffic_volume : (traffic_volume ?? null);
 
   const isIntervened = intervention !== undefined;
 
@@ -64,6 +74,37 @@ const InterventionCard: React.FC<InterventionCardProps> = ({
     });
   };
 
+  const handleHeatIntervention = (level: 'none' | 'shade' | 'cool_pavement' | 'combined') => {
+    const base = heat_index ?? 85;
+    let target = base;
+    // Shade structures reduce apparent temp by ~5-8°F (FHWA research)
+    if (level === 'shade') target = base - 7;
+    // Cool pavement coatings reduce by ~5°F (EPA cool pavement guide)
+    if (level === 'cool_pavement') target = base - 5;
+    // Combined: shade + cool pavement + misting
+    if (level === 'combined') target = base - 15;
+    target = Math.max(target, 60); // floor at comfortable
+
+    onUpdateIntervention(segment.id, {
+      ...intervention,
+      heat_index: level === 'none' ? base : target,
+    });
+  };
+
+  const handleTrafficCalming = (level: 'none' | 'minor' | 'major') => {
+    const base = traffic_volume ?? 5000;
+    let target = base;
+    // Road diets / lane reductions typically reduce volume 10-20%
+    if (level === 'minor') target = Math.round(base * 0.7);
+    // Full pedestrianization / traffic diversion
+    if (level === 'major') target = Math.round(base * 0.3);
+
+    onUpdateIntervention(segment.id, {
+      ...intervention,
+      traffic_volume: level === 'none' ? base : target,
+    });
+  };
+
   // Cost estimation
   const costItems: { label: string; cost: number }[] = [];
   const baseCanopy = canopy_pct ?? 20;
@@ -77,6 +118,18 @@ const InterventionCard: React.FC<InterventionCardProps> = ({
   const baseSafety = safety_score ?? 70;
   if (activeSafety === 100 && baseSafety < 100) {
     costItems.push({ label: '🛡️ Sidewalk Upgrade', cost: 35000 });
+  }
+  const baseHeat = heat_index ?? 85;
+  if (activeHeat < baseHeat) {
+    const heatDelta = baseHeat - activeHeat;
+    if (heatDelta >= 12) costItems.push({ label: '🌡️ Shade + Cool Pavement', cost: 75000 });
+    else if (heatDelta >= 6) costItems.push({ label: '🌡️ Shade Structures', cost: 40000 });
+    else costItems.push({ label: '🌡️ Cool Pavement', cost: 25000 });
+  }
+  const baseTraffic = traffic_volume ?? 5000;
+  if (activeTraffic !== null && activeTraffic < baseTraffic) {
+    const reduction = 1 - (activeTraffic / baseTraffic);
+    costItems.push({ label: '🚗 Traffic Calming', cost: reduction > 0.5 ? 120000 : 50000 });
   }
   const totalCost = costItems.reduce((sum, item) => sum + item.cost, 0);
 
@@ -123,7 +176,7 @@ const InterventionCard: React.FC<InterventionCardProps> = ({
 
       <div className="workbench-section">
         <div className="workbench-row" style={{ marginBottom: 6 }}>
-          <label>🔊 Proposed Traffic Calming</label>
+          <label>🔊 Proposed Noise Reduction</label>
           <span>{activeNoise.toFixed(0)} dBA</span>
         </div>
         <div style={{ display: 'flex', gap: 6 }}>
@@ -148,6 +201,41 @@ const InterventionCard: React.FC<InterventionCardProps> = ({
         </div>
       </div>
 
+      {heat_index !== null && (
+        <div className="workbench-section">
+          <div className="workbench-row" style={{ marginBottom: 6 }}>
+            <label>🌡️ Proposed Cooling</label>
+            <span>{activeHeat.toFixed(0)}°F peak</span>
+          </div>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            <button
+              className={`btn-pill ${activeHeat >= baseHeat ? 'active' : ''}`}
+              onClick={() => handleHeatIntervention('none')}
+            >
+              None
+            </button>
+            <button
+              className={`btn-pill ${activeHeat < baseHeat && activeHeat > baseHeat - 6 ? 'active' : ''}`}
+              onClick={() => handleHeatIntervention('cool_pavement')}
+            >
+              Cool Pavement (-5°F)
+            </button>
+            <button
+              className={`btn-pill ${activeHeat <= baseHeat - 6 && activeHeat > baseHeat - 12 ? 'active' : ''}`}
+              onClick={() => handleHeatIntervention('shade')}
+            >
+              Shade Structures (-7°F)
+            </button>
+            <button
+              className={`btn-pill ${activeHeat <= baseHeat - 12 ? 'active' : ''}`}
+              onClick={() => handleHeatIntervention('combined')}
+            >
+              Combined (-15°F)
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="workbench-section">
         <div className="workbench-row" style={{ marginBottom: 6 }}>
           <label>🛡️ Proposed Sidewalk Upgrade</label>
@@ -161,6 +249,35 @@ const InterventionCard: React.FC<InterventionCardProps> = ({
           {activeSafety === 100 ? '✨ Upgraded to Complete Streets' : 'Upgrade to Complete Streets'}
         </button>
       </div>
+
+      {traffic_volume !== null && (
+        <div className="workbench-section">
+          <div className="workbench-row" style={{ marginBottom: 6 }}>
+            <label>🚗 Proposed Traffic Calming</label>
+            <span>{activeTraffic !== null ? activeTraffic.toLocaleString() : '—'} AADT</span>
+          </div>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button
+              className={`btn-pill ${activeTraffic !== null && activeTraffic >= baseTraffic ? 'active' : ''}`}
+              onClick={() => handleTrafficCalming('none')}
+            >
+              None
+            </button>
+            <button
+              className={`btn-pill ${activeTraffic !== null && activeTraffic < baseTraffic && activeTraffic > baseTraffic * 0.5 ? 'active' : ''}`}
+              onClick={() => handleTrafficCalming('minor')}
+            >
+              Road Diet (-30%)
+            </button>
+            <button
+              className={`btn-pill ${activeTraffic !== null && activeTraffic <= baseTraffic * 0.5 ? 'active' : ''}`}
+              onClick={() => handleTrafficCalming('major')}
+            >
+              Diversion (-70%)
+            </button>
+          </div>
+        </div>
+      )}
 
       {costItems.length > 0 && (
         <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: 10, marginBottom: 8 }}>

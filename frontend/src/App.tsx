@@ -65,7 +65,7 @@ const App: React.FC = () => {
 
   // Scenario modeling overrides: segment_id -> overridden values
   const [interventions, setInterventions] = useState<
-    Record<string, { canopy_pct?: number; noise_dba?: number; safety_score?: number }>
+    Record<string, { canopy_pct?: number; noise_dba?: number; safety_score?: number; heat_index?: number; traffic_volume?: number }>
   >({});
 
   const statusClass = loading ? 'loading' : error ? 'error' : data ? 'success' : '';
@@ -195,8 +195,9 @@ const App: React.FC = () => {
       const override = interventions[id];
       const noise = override?.noise_dba !== undefined ? override.noise_dba : f.properties.noise_dba;
       const canopy = override?.canopy_pct !== undefined ? override.canopy_pct : f.properties.canopy_pct;
-      const heat = f.properties.heat_index;
+      const heat = override?.heat_index !== undefined ? override.heat_index : f.properties.heat_index;
       const safety = override?.safety_score !== undefined ? override.safety_score : f.properties.safety_score;
+      const traffic = override?.traffic_volume !== undefined ? override.traffic_volume : f.properties.traffic_volume;
 
       return computeComfortScoreClient(
         noise,
@@ -207,7 +208,7 @@ const App: React.FC = () => {
         wCanopy,
         wHeat,
         wSafety,
-        f.properties.traffic_volume,
+        traffic,
         wTraffic,
       );
     });
