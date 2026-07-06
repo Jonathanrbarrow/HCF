@@ -12,6 +12,7 @@ Features:
   - Per-segment data quality tracking
 """
 import re
+import time
 
 import osmnx as ox
 import pandas as pd
@@ -262,7 +263,7 @@ def generate_comfort_geojson(place_query: str, max_segments: int = 200) -> dict:
     """
     Generate a GeoJSON FeatureCollection of scored street segments.
 
-    Uses result caching (1h TTL) to avoid re-computing for the same city.
+    Uses result caching (30d TTL) to avoid re-computing for the same city.
 
     Args:
         place_query: OSMnx place string
@@ -274,9 +275,12 @@ def generate_comfort_geojson(place_query: str, max_segments: int = 200) -> dict:
     # Check result cache
     cached = get_result_cache(place_query, max_segments)
     if cached is not None:
+        cached.setdefault("metadata", {})["from_cache"] = True
         return cached
 
+    t0 = time.time()
     scored = score_city_segments(place_query, max_segments=max_segments)
+    elapsed = round(time.time() - t0, 2)
 
     features = []
     for _, row in scored.iterrows():
@@ -305,6 +309,9 @@ def generate_comfort_geojson(place_query: str, max_segments: int = 200) -> dict:
         "metadata": {
             "place": place_query,
             "total_segments": len(features),
+            "elapsed_seconds": elapsed,
+            "from_cache": False,
+            "data_note": "All data is historical/static. Heat = 3-year summer peak avg. Noise = 2020 DOT. Traffic = annual avg.",
         },
     }
 

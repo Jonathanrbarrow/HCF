@@ -59,8 +59,11 @@ jobs:
         # Includes live API calls to Meta/WRI S3 canopy data
         run: python -m pytest tests/test_canopy.py -v --tb=short
       - name: Run heat API tests
-        # Includes live API calls to Open-Meteo weather service
+        # Includes live API calls to Open-Meteo historical archive
         run: python -m pytest tests/test_heat.py -v --tb=short
+      - name: Run traffic API tests
+        # Includes live API calls to FHWA HPMS ArcGIS REST
+        run: python -m pytest tests/test_traffic.py -v --tb=short
 
   network-tests:
     name: "Backend: OSM Network"
