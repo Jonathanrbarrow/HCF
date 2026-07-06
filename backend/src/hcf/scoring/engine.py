@@ -4,22 +4,23 @@ Scoring module — computes Comfort Scores from environmental data.
 Formula:
   Comfort Score = 100 - [(wN × Noise_Penalty) + (wC × Canopy_Penalty)
                          + (wH × Heat_Penalty) + (wS × Safety_Penalty)
-                         + (wT × Traffic_Penalty)]
+                         + (wT × Traffic_Penalty) + (wA × AQI_Penalty)]
 
 Each penalty is normalized to 0.0 - 1.0.
-Weights default to equal (1/5 each) and are user-adjustable.
-Traffic is feature-flagged — when traffic_volume is None, its weight
-is excluded and the remaining weights auto-normalize.
+Weights default to equal (1/6 each) and are user-adjustable.
+Any factor set to None is excluded — its weight is removed and the
+remaining weights auto-normalize.
 Score is always clamped to [0, 100].
 """
 
-# Default weights — equal importance (1/5 each)
+# Default weights — equal importance
 DEFAULT_WEIGHTS = {
-    "noise": 0.20,
-    "canopy": 0.20,
-    "heat": 0.20,
-    "safety": 0.20,
-    "traffic": 0.20,
+    "noise": 1.0 / 6,
+    "canopy": 1.0 / 6,
+    "heat": 1.0 / 6,
+    "safety": 1.0 / 6,
+    "traffic": 1.0 / 6,
+    "aqi": 1.0 / 6,
 }
 
 # Maximum total penalty (sum of weighted penalties is scaled to this)
@@ -104,12 +105,31 @@ def _traffic_penalty(aadt: float) -> float:
         return (aadt - 1000.0) / (30000.0 - 1000.0)
 
 
+def _aqi_penalty(aqi: float) -> float:
+    """
+    Convert AQI (Air Quality Index) to penalty (0.0 - 1.0).
+
+    Thresholds based on EPA AQI categories:
+    - <= 50: 0.0 (Good — no health concern)
+    - >= 200: 1.0 (Very Unhealthy — significant risk)
+    - Linear interpolation between
+    """
+    aqi = max(0.0, float(aqi))
+    if aqi <= 50.0:
+        return 0.0
+    elif aqi >= 200.0:
+        return 1.0
+    else:
+        return (aqi - 50.0) / (200.0 - 50.0)
+
+
 def compute_comfort_score(
     noise_dba: float | None = 0.0,
     canopy_pct: float | None = 100.0,
     heat_index: float | None = 70.0,
     safety_score: float | None = 100.0,
     traffic_volume: float | None = None,
+    aqi: float | None = None,
     weights: dict | None = None,
 ) -> float:
     """
@@ -125,8 +145,9 @@ def compute_comfort_score(
         heat_index: Heat index in °F, or None to exclude
         safety_score: Road pedestrian safety score (0-100), or None to exclude
         traffic_volume: AADT, or None to exclude
+        aqi: Air Quality Index (0-500), or None to exclude
         weights: Optional dict with keys "noise", "canopy", "heat",
-                 "safety", "traffic". Values are relative weights
+                 "safety", "traffic", "aqi". Values are relative weights
                  (will be normalized to sum to 1.0).
                  Defaults to equal weights.
 
@@ -147,6 +168,8 @@ def compute_comfort_score(
         penalties["safety"] = _safety_penalty(safety_score)
     if traffic_volume is not None:
         penalties["traffic"] = _traffic_penalty(traffic_volume)
+    if aqi is not None:
+        penalties["aqi"] = _aqi_penalty(aqi)
 
     # Strip weights for disabled factors
     w = {k: v for k, v in w.items() if k in penalties}

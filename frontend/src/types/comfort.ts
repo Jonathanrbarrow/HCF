@@ -5,6 +5,7 @@ export interface DataQuality {
   heat: 'real' | 'default' | 'unavailable' | 'fixed' | 'disabled';
   safety: 'real' | 'default' | 'unavailable' | 'disabled';
   traffic: 'real' | 'default' | 'unavailable' | 'disabled';
+  aqi: 'real' | 'default' | 'unavailable' | 'disabled';
 }
 
 export interface ComfortProperties {
@@ -15,6 +16,7 @@ export interface ComfortProperties {
   heat_index: number | null;
   safety_score: number | null;
   traffic_volume: number | null;
+  aqi: number | null;
   street_name: string;
   data_quality?: DataQuality;
 }

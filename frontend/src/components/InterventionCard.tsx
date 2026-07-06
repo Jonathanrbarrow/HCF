@@ -64,6 +64,22 @@ const InterventionCard: React.FC<InterventionCardProps> = ({
     });
   };
 
+  // Cost estimation
+  const costItems: { label: string; cost: number }[] = [];
+  const baseCanopy = canopy_pct ?? 20;
+  if (activeCanopy > baseCanopy) {
+    costItems.push({ label: '🌳 Tree Planting', cost: Math.ceil((activeCanopy - baseCanopy) / 10) * 2500 });
+  }
+  const baseNoise = noise_dba ?? 65;
+  if (activeNoise < baseNoise) {
+    costItems.push({ label: '🔊 Noise Barrier', cost: activeNoise <= 45 ? 45000 : 15000 });
+  }
+  const baseSafety = safety_score ?? 70;
+  if (activeSafety === 100 && baseSafety < 100) {
+    costItems.push({ label: '🛡️ Sidewalk Upgrade', cost: 35000 });
+  }
+  const totalCost = costItems.reduce((sum, item) => sum + item.cost, 0);
+
   return (
     <div className="intervention-card">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
@@ -145,6 +161,23 @@ const InterventionCard: React.FC<InterventionCardProps> = ({
           {activeSafety === 100 ? '✨ Upgraded to Complete Streets' : 'Upgrade to Complete Streets'}
         </button>
       </div>
+
+      {costItems.length > 0 && (
+        <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: 10, marginBottom: 8 }}>
+          <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 8 }}>💰 Estimated Cost</div>
+          {costItems.map((item) => (
+            <div key={item.label} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 4 }}>
+              <span style={{ color: 'var(--text-secondary)' }}>{item.label}</span>
+              <span style={{ color: 'var(--text-primary)' }}>${item.cost.toLocaleString()}</span>
+            </div>
+          ))}
+          <div style={{ borderTop: '1px solid var(--border)', marginTop: 6, paddingTop: 6, display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+            <span style={{ fontWeight: 700 }}>Total</span>
+            <span style={{ fontWeight: 700, color: 'var(--accent)' }}>${totalCost.toLocaleString()}</span>
+          </div>
+          <div style={{ fontSize: 9, color: 'var(--text-secondary)', marginTop: 6, fontStyle: 'italic' }}>Rough planning estimate only</div>
+        </div>
+      )}
 
       {isIntervened && (
         <button className="reset-btn" onClick={handleReset}>

@@ -47,7 +47,7 @@ const SegmentPopup: React.FC<SegmentPopupProps> = ({ properties }) => {
         )}
         {heat_index !== null && (
           <>
-            🌡️ Apparent Temp: {heat_index.toFixed(1)}°F
+            🌡️ Summer Peak Avg: {heat_index.toFixed(1)}°F
             {dq && dq.heat !== 'real' && (
               <span style={{ color: '#f97316', marginLeft: 4 }} title="Estimated or fixed heat data">⚠</span>
             )}

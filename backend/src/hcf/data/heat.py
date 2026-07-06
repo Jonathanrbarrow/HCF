@@ -1,109 +1,143 @@
 """
-Heat module — fetches apparent temperature (heat index) from the Open-Meteo API.
+Heat module — fetches **historical summer peak** apparent temperature
+from the Open-Meteo Archive API.
 
-No authentication is required. Apparent temperature combines temperature, relative humidity,
-wind chill, and solar radiation to estimate feels-like temperature.
+Unlike the previous implementation which returned the *current* temperature
+(useless for planning — changes every hour), this version computes
+the average daily peak apparent temperature during summer months
+(June–August) over the past 3 years.  This gives a stable, representative
+"typical hot day" value for infrastructure planning.
+
+No authentication required.
 """
-import requests
 import logging
+from datetime import date
+
+import requests
+
 from hcf.config import settings
 
 logger = logging.getLogger(__name__)
 
+# Open-Meteo Historical Archive endpoint
+_ARCHIVE_URL = "https://archive-api.open-meteo.com/v1/archive"
+
+
+def _summer_date_range() -> tuple[str, str]:
+    """Return (start_date, end_date) covering the last 3 complete summers."""
+    current_year = date.today().year
+    # Use last 3 complete summers (June 1 – August 31)
+    # If we're currently in summer, use the previous 3
+    if date.today().month <= 8:
+        end_year = current_year - 1
+    else:
+        end_year = current_year
+    start_year = end_year - 2
+    return (f"{start_year}-06-01", f"{end_year}-08-31")
+
 
 def fetch_heat_at_point(lat: float, lon: float) -> float | None:
     """
-    Fetch the apparent temperature (Fahrenheit) for a specific latitude and longitude.
+    Fetch the average summer peak apparent temperature (°F) for a location.
 
-    Args:
-        lat: Latitude
-        lon: Longitude
+    Queries the Open-Meteo Archive API for the last 3 summers of daily
+    max apparent temperature and returns the mean.
 
     Returns:
-        float apparent temperature in Fahrenheit, or None if the request fails.
+        float: Mean daily peak apparent temp in °F over 3 summers, or None.
     """
     try:
-        url = (
-            f"{settings.heat_api_url}?"
-            f"latitude={lat}&longitude={lon}&"
-            f"current=apparent_temperature&"
-            f"temperature_unit=fahrenheit"
+        start, end = _summer_date_range()
+        resp = requests.get(
+            _ARCHIVE_URL,
+            params={
+                "latitude": round(lat, 4),
+                "longitude": round(lon, 4),
+                "start_date": start,
+                "end_date": end,
+                "daily": "apparent_temperature_max",
+                "temperature_unit": "fahrenheit",
+                "timezone": "auto",
+            },
+            timeout=15,
         )
-        resp = requests.get(url, timeout=10)
-        if resp.status_code == 200:
-            data = resp.json()
-            if "current" in data and "apparent_temperature" in data["current"]:
-                return float(data["current"]["apparent_temperature"])
-        logger.warning(f"Heat API returned status {resp.status_code} for point ({lat}, {lon})")
-        return None
+        if resp.status_code != 200:
+            logger.warning(
+                "Heat archive API returned %d for (%.4f, %.4f)",
+                resp.status_code, lat, lon,
+            )
+            return None
+
+        data = resp.json()
+        daily = data.get("daily", {})
+        temps = daily.get("apparent_temperature_max", [])
+
+        # Filter out nulls and compute mean
+        valid = [t for t in temps if t is not None]
+        if not valid:
+            return None
+
+        return sum(valid) / len(valid)
+
     except Exception as e:
-        logger.error(f"Error fetching heat data at point ({lat}, {lon}): {str(e)}")
+        logger.error("Error fetching heat archive for (%.4f, %.4f): %s", lat, lon, e)
         return None
 
 
 def fetch_heat_batch(points: list[tuple[float, float]]) -> list[dict]:
     """
-    Fetch apparent temperature in batch for a list of (lat, lon) coordinates.
-    Open-Meteo supports multi-point queries in a single request.
+    Fetch historical summer peak heat for a batch of points.
 
-    Args:
-        points: List of (lat, lon) coordinate tuples
+    Since nearby points share the same climate, we deduplicate by rounding
+    to 1 decimal place (~11km grid) — all points within a grid cell get
+    the same historical average.
 
     Returns:
-        List of dicts: [{"value": float | None, "quality": "real" | "default" | "unavailable"}, ...]
+        List of dicts: [{"value": float|None, "quality": "real"|"default"|"unavailable"}, ...]
     """
     if not points:
         return []
 
-    # If single point, use the single point fetch wrapper to avoid list/dict return variation
-    if len(points) == 1:
-        lat, lon = points[0]
-        val = fetch_heat_at_point(lat, lon)
-        if val is not None:
-            return [{"value": val, "quality": "real"}]
-        else:
-            return [{"value": settings.default_heat_index, "quality": "default"}]
+    from concurrent.futures import ThreadPoolExecutor, as_completed
 
-    try:
-        # Build batch parameters
-        lats = ",".join(str(p[0]) for p in points)
-        lons = ",".join(str(p[1]) for p in points)
+    # Deduplicate: round to 1 decimal (~11km grid cells).
+    # Historical climate doesn't vary at street level.
+    cache: dict[tuple[float, float], float | None] = {}
 
-        url = (
-            f"{settings.heat_api_url}?"
-            f"latitude={lats}&longitude={lons}&"
-            f"current=apparent_temperature&"
-            f"temperature_unit=fahrenheit"
-        )
-        resp = requests.get(url, timeout=15)
-        if resp.status_code == 200:
-            data = resp.json()
-            # If multi-point, Open-Meteo returns a list of dictionaries
-            if isinstance(data, list):
-                results = []
-                for item in data:
-                    val = None
-                    quality = "unavailable"
-                    if "current" in item and "apparent_temperature" in item["current"]:
-                        val = float(item["current"]["apparent_temperature"])
-                        quality = "real"
-                    else:
-                        val = settings.default_heat_index
-                        quality = "default"
-                    results.append({"value": val, "quality": quality})
-                return results
+    def _rounded(lat: float, lon: float) -> tuple[float, float]:
+        return (round(lat, 1), round(lon, 1))
 
-        # Fallback to per-point queries if API returned something else or failed
-        logger.warning(f"Heat API batch query failed with status {resp.status_code}. Falling back to per-point.")
-    except Exception as e:
-        logger.error(f"Error fetching heat batch: {str(e)}. Falling back to per-point.")
+    unique_cells: dict[tuple[float, float], tuple[float, float]] = {}
+    for lat, lon in points:
+        key = _rounded(lat, lon)
+        if key not in unique_cells:
+            unique_cells[key] = (lat, lon)
 
-    # Fallback path
+    def _fetch_cell(
+        item: tuple[tuple[float, float], tuple[float, float]],
+    ) -> tuple[tuple[float, float], float | None]:
+        cell_key, (lat, lon) = item
+        return cell_key, fetch_heat_at_point(lat, lon)
+
+    # For small cities, most/all points will be in the same grid cell
+    # → typically just 1-3 API calls instead of 200
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        futures = {
+            executor.submit(_fetch_cell, (k, v)): k
+            for k, v in unique_cells.items()
+        }
+        for future in as_completed(futures):
+            cell_key, value = future.result()
+            cache[cell_key] = value
+
+    # Map results back to all points
     results = []
     for lat, lon in points:
-        val = fetch_heat_at_point(lat, lon)
-        if val is not None:
-            results.append({"value": val, "quality": "real"})
+        key = _rounded(lat, lon)
+        value = cache.get(key)
+        if value is not None:
+            results.append({"value": round(value, 1), "quality": "real"})
         else:
             results.append({"value": settings.default_heat_index, "quality": "default"})
+
     return results

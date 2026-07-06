@@ -29,6 +29,13 @@ const computeTrafficPenalty = (aadt: number | null): number => {
   return (aadt - 1000) / (30000 - 1000);
 };
 
+const computeAqiPenalty = (aqi: number | null): number => {
+  if (aqi === null) return 0.0;
+  if (aqi <= 50) return 0.0;
+  if (aqi >= 200) return 1.0;
+  return (aqi - 50) / (200 - 50);
+};
+
 /**
  * Compute comfort score client-side with user-adjustable weights.
  *
@@ -46,6 +53,8 @@ export const computeComfortScoreClient = (
   wSafety: number,
   trafficVolume: number | null = null,
   wTraffic: number = 0,
+  aqiValue: number | null = null,
+  wAqi: number = 0,
 ): number => {
   // Build penalty/weight pairs — only include non-null factors with non-zero weight
   const factors: { penalty: number; weight: number }[] = [];
@@ -56,6 +65,9 @@ export const computeComfortScoreClient = (
   if (wSafety > 0) factors.push({ penalty: computeSafetyPenalty(safetyScore), weight: wSafety });
   if (wTraffic > 0 && trafficVolume !== null) {
     factors.push({ penalty: computeTrafficPenalty(trafficVolume), weight: wTraffic });
+  }
+  if (wAqi > 0 && aqiValue !== null) {
+    factors.push({ penalty: computeAqiPenalty(aqiValue), weight: wAqi });
   }
 
   const totalWeight = factors.reduce((sum, f) => sum + f.weight, 0);

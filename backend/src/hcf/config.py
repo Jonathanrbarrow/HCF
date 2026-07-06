@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     # Cache
     cache_dir: str = ".cache"
     cache_ttl_network: int = 86400    # 24h
-    cache_ttl_result: int = 3600      # 1h
+    cache_ttl_result: int = 2592000   # 30 days — all data is static/historical
 
     # Noise API
     noise_api_url: str = "https://geo.dot.gov/server/rest/services/Hosted/NTAD_Noise_2020_CONUS_Road/MapServer"
@@ -34,6 +34,10 @@ class Settings(BaseSettings):
     traffic_api_url: str = "https://geo.dot.gov/server/rest/services/Hosted"
     traffic_default_aadt: int = 5000
 
+    # Air Quality (EPA AirNow)
+    airnow_api_key: str = ""  # Set via HCF_AIRNOW_API_KEY env var
+    aqi_default: int = 50  # "Good" AQI as default
+
     # Feature toggles — disable any factor for troubleshooting
     # (set via env: HCF_ENABLE_NOISE_FACTOR=false, etc.)
     enable_noise_factor: bool = True
@@ -41,6 +45,7 @@ class Settings(BaseSettings):
     enable_heat_factor: bool = True
     enable_safety_factor: bool = True
     enable_traffic_factor: bool = True
+    enable_aqi_factor: bool = False  # off by default — no street-level intervention model
 
     # API
     max_segments_default: int = 200

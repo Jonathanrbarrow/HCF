@@ -26,6 +26,7 @@ def health_check():
             "heat": settings.enable_heat_factor,
             "safety": settings.enable_safety_factor,
             "traffic": settings.enable_traffic_factor,
+            "aqi": settings.enable_aqi_factor,
         },
     }
 
