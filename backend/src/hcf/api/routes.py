@@ -33,7 +33,7 @@ def health_check():
 
 @router.get("/api/v1/comfort")
 def get_comfort_map(
-    city: str = Query(..., description="City name, e.g. 'Denver, Colorado, USA'"),
+    city: str = Query(..., description="City name, e.g. 'Denver, Colorado, USA'", min_length=2, max_length=200),
     max_segments: int = Query(
         settings.max_segments_default,
         description="Maximum street segments to return",

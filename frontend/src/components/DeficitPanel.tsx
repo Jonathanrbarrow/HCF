@@ -1,7 +1,8 @@
 import React, { useMemo } from 'react';
-import type { ComfortGeoJSON, ComfortFeature } from '../types/comfort';
+import type { ComfortGeoJSON, ComfortFeature, ComfortProperties } from '../types/comfort';
 import { computeComfortScoreClient } from '../utils/scoring';
 import { scoreToColor, scoreToLabel } from '../utils/colors';
+import { getSegmentId } from '../utils/segments';
 
 interface DeficitPanelProps {
   data: ComfortGeoJSON | null;
@@ -10,7 +11,7 @@ interface DeficitPanelProps {
   wHeat: number;
   wSafety: number;
   wTraffic: number;
-  onSelectSegment: (lat: number, lon: number, properties: any) => void;
+  onSelectSegment: (lat: number, lon: number, properties: ComfortProperties, segmentId: string) => void;
 }
 
 const DeficitPanel: React.FC<DeficitPanelProps> = ({
@@ -109,7 +110,8 @@ const DeficitPanel: React.FC<DeficitPanelProps> = ({
     }
 
     if (lat !== 0 || lon !== 0) {
-      onSelectSegment(lat, lon, { ...f.properties, comfort_score: score });
+      const segId = getSegmentId(f);
+      onSelectSegment(lat, lon, { ...f.properties, comfort_score: score }, segId);
     }
   };
 
@@ -122,12 +124,12 @@ const DeficitPanel: React.FC<DeficitPanelProps> = ({
         Lowest scored street segments in view. Click to inspect on map.
       </p>
       <div className="deficit-list">
-        {worstSegments.map(({ feature, score }, idx) => {
+        {worstSegments.map(({ feature, score }) => {
           const color = scoreToColor(score);
           const label = scoreToLabel(score);
           const name = feature.properties.street_name || 'Unnamed Path';
           const stressor = getPrimaryStressor(feature);
-          const segId = `${feature.properties.street_name}#${(feature.geometry as any).coordinates?.[0]?.[0]?.toFixed(5) ?? idx}`;
+          const segId = getSegmentId(feature);
 
           return (
             <div
@@ -135,6 +137,7 @@ const DeficitPanel: React.FC<DeficitPanelProps> = ({
               className="deficit-item"
               role="button"
               tabIndex={0}
+              aria-label={`Inspect ${name} segment with score ${score}`}
               onClick={() => handleItemClick(feature, score)}
               onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleItemClick(feature, score); } }}
             >

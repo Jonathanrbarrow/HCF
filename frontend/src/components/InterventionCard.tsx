@@ -1,6 +1,7 @@
 import React from 'react';
 import type { ComfortProperties } from '../types/comfort';
 import { scoreToColor } from '../utils/colors';
+import { computeComfortScoreClient } from '../utils/scoring';
 
 interface InterventionCardProps {
   segment: {
@@ -24,6 +25,11 @@ interface InterventionCardProps {
     traffic_volume?: number;
   } | null) => void;
   onClose: () => void;
+  wNoise: number;
+  wCanopy: number;
+  wHeat: number;
+  wSafety: number;
+  wTraffic: number;
 }
 
 const InterventionCard: React.FC<InterventionCardProps> = ({
@@ -31,10 +37,15 @@ const InterventionCard: React.FC<InterventionCardProps> = ({
   intervention,
   onUpdateIntervention,
   onClose,
+  wNoise,
+  wCanopy,
+  wHeat,
+  wSafety,
+  wTraffic,
 }) => {
   if (!segment) return null;
 
-  const { street_name, noise_dba, canopy_pct, safety_score, heat_index, traffic_volume, comfort_score } = segment.properties;
+  const { street_name, noise_dba, canopy_pct, safety_score, heat_index, traffic_volume } = segment.properties;
 
   // Active values (either proposed or original)
   const activeCanopy = intervention?.canopy_pct !== undefined ? intervention.canopy_pct : (canopy_pct ?? 20);
@@ -44,6 +55,20 @@ const InterventionCard: React.FC<InterventionCardProps> = ({
   const activeTraffic = intervention?.traffic_volume !== undefined ? intervention.traffic_volume : (traffic_volume ?? null);
 
   const isIntervened = intervention !== undefined;
+
+  // Recompute comfort score from active values so it updates after interventions
+  const liveScore = computeComfortScoreClient(
+    activeNoise,
+    activeCanopy,
+    activeHeat,
+    activeSafety,
+    wNoise,
+    wCanopy,
+    wHeat,
+    wSafety,
+    activeTraffic,
+    wTraffic,
+  );
 
   const handleReset = () => {
     onUpdateIntervention(segment.id, null);
@@ -148,7 +173,7 @@ const InterventionCard: React.FC<InterventionCardProps> = ({
       <div style={{ display: 'flex', gap: 12, alignItems: 'center', margin: '12px 0', padding: '10px', background: 'rgba(255,255,255,0.03)', borderRadius: 8 }}>
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: 10, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Baseline Comfort</div>
-          <div style={{ fontSize: 20, fontWeight: 700, color: scoreToColor(comfort_score) }}>{comfort_score.toFixed(0)}</div>
+          <div style={{ fontSize: 20, fontWeight: 700, color: scoreToColor(liveScore) }}>{liveScore}</div>
         </div>
         <div style={{ borderLeft: '1px solid var(--border)', height: 32 }} />
         <div style={{ flex: 1, paddingLeft: 8 }}>
@@ -171,6 +196,7 @@ const InterventionCard: React.FC<InterventionCardProps> = ({
           value={activeCanopy}
           onChange={handleCanopyChange}
           style={{ width: '100%', marginTop: 4 }}
+          aria-label="Proposed tree canopy percentage"
         />
       </div>
 
@@ -181,20 +207,23 @@ const InterventionCard: React.FC<InterventionCardProps> = ({
         </div>
         <div style={{ display: 'flex', gap: 6 }}>
           <button
-            className={`btn-pill ${activeNoise >= 60 ? 'active' : ''}`}
+            className={`btn-pill ${activeNoise >= (noise_dba ?? 65) ? 'active' : ''}`}
             onClick={() => handleNoiseLevel('none')}
+            aria-label="No noise reduction"
           >
             None
           </button>
           <button
-            className={`btn-pill ${activeNoise >= 50 && activeNoise < 60 ? 'active' : ''}`}
+            className={`btn-pill ${activeNoise < (noise_dba ?? 65) && activeNoise >= 50 ? 'active' : ''}`}
             onClick={() => handleNoiseLevel('minor')}
+            aria-label="Minor noise reduction"
           >
             Minor (-10dB)
           </button>
           <button
             className={`btn-pill ${activeNoise < 50 ? 'active' : ''}`}
             onClick={() => handleNoiseLevel('major')}
+            aria-label="Major noise reduction"
           >
             Major (-20dB)
           </button>

@@ -10,8 +10,11 @@ to sample pixel values at specific lat/lon points.
 
 No authentication required.
 """
+import logging
 import requests
 import math
+
+logger = logging.getLogger(__name__)
 
 from hcf.config import settings
 
@@ -106,6 +109,7 @@ def fetch_noise_at_point(lat: float, lon: float) -> float | None:
         return None
 
     except Exception:
+        logger.debug("Failed to fetch noise for (%.4f, %.4f)", lat, lon, exc_info=True)
         return None
 
 
@@ -146,6 +150,11 @@ def fetch_noise_batch(points: list[tuple[float, float]]) -> list[dict]:
         for future in as_completed(futures):
             idx, result = future.result()
             results[idx] = result
+
+    # Safety net: replace any remaining None entries (thread execution failed)
+    for i, r in enumerate(results):
+        if r is None:
+            results[i] = {"value": None, "quality": "unavailable"}
 
     return results  # type: ignore[return-value]
 

@@ -3,10 +3,11 @@ import React from 'react';
 interface SearchBarProps {
   onSearch: (city: string) => void;
   loading: boolean;
+  initialValue?: string;
 }
 
-const SearchBar: React.FC<SearchBarProps> = ({ onSearch, loading }) => {
-  const [value, setValue] = React.useState('');
+const SearchBar: React.FC<SearchBarProps> = ({ onSearch, loading, initialValue = '' }) => {
+  const [value, setValue] = React.useState(initialValue);
 
   const handleSubmit = () => {
     const trimmed = value.trim();

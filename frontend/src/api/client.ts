@@ -26,6 +26,7 @@ export class ApiError extends Error {
 export async function fetchComfortData(
   city: string,
   maxSegments: number = DEFAULT_MAX_SEGMENTS,
+  signal?: AbortSignal,
 ): Promise<ComfortGeoJSON> {
   const base = getBaseUrl();
   const params = new URLSearchParams({
@@ -33,7 +34,7 @@ export async function fetchComfortData(
     max_segments: String(maxSegments),
   });
 
-  const resp = await fetch(`${base}/api/v1/comfort?${params.toString()}`);
+  const resp = await fetch(`${base}/api/v1/comfort?${params.toString()}`, { signal });
 
   if (!resp.ok) {
     let detail = `HTTP ${resp.status}`;

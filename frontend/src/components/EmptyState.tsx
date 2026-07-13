@@ -25,6 +25,7 @@ const EmptyState: React.FC<EmptyStateProps> = ({ onSelectCity }) => {
               key={city.label}
               className="empty-state-city-btn"
               onClick={() => onSelectCity(city.query)}
+              aria-label={`Analyze ${city.label}`}
             >
               {city.label}
             </button>

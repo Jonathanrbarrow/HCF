@@ -24,7 +24,12 @@ _ARCHIVE_URL = "https://archive-api.open-meteo.com/v1/archive"
 
 
 def _summer_date_range() -> tuple[str, str]:
-    """Return (start_date, end_date) covering the last 3 complete summers."""
+    """Return (start_date, end_date) covering the last 3 complete summers.
+
+    NOTE: Assumes Northern Hemisphere (June-August = summer).
+    This is correct for US cities but would need adjustment for
+    Southern Hemisphere locations.
+    """
     current_year = date.today().year
     # Use last 3 complete summers (June 1 – August 31)
     # If we're currently in summer, use the previous 3
@@ -127,8 +132,11 @@ def fetch_heat_batch(points: list[tuple[float, float]]) -> list[dict]:
             for k, v in unique_cells.items()
         }
         for future in as_completed(futures):
-            cell_key, value = future.result()
-            cache[cell_key] = value
+            try:
+                cell_key, value = future.result()
+                cache[cell_key] = value
+            except Exception:
+                pass  # cell stays absent → will get default heat index
 
     # Map results back to all points
     results = []

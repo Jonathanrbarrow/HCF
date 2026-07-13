@@ -7,10 +7,11 @@ This is the core integration layer. Every function is parameterized
 by city name or bounding box — zero hardcoded coordinates.
 
 Features:
-  - Cached walk networks (24h TTL) and results (1h TTL)
+  - Cached walk networks (24h TTL) and results (30d TTL)
   - Batch environmental data fetching (grouped by tile/region)
   - Per-segment data quality tracking
 """
+import logging
 import re
 import time
 
@@ -32,6 +33,8 @@ from hcf.cache.store import (
     get_result_cache, set_result_cache,
 )
 
+logger = logging.getLogger(__name__)
+
 
 def _fetch_network_cached(place_query: str):
     """Fetch walk network with 24h file cache."""
@@ -43,7 +46,7 @@ def _fetch_network_cached(place_query: str):
     return graph
 
 
-def score_city_segments(place_query: str, max_segments: int = 500) -> gpd.GeoDataFrame:
+def score_city_segments(place_query: str, max_segments: int = 200) -> gpd.GeoDataFrame:
     """
     Fetch a city's walk network, sample environmental data for each
     segment, and compute comfort scores.
@@ -63,6 +66,12 @@ def score_city_segments(place_query: str, max_segments: int = 500) -> gpd.GeoDat
     # Limit segments for API rate limiting
     if max_segments and len(edges) > max_segments:
         edges = edges.sample(n=max_segments, random_state=42)
+
+    if len(edges) == 0:
+        logger.warning(
+            "No walkable segments found for '%s'", place_query
+        )
+        return gpd.GeoDataFrame(columns=["geometry", "comfort_score"])
 
     # Step 2: Extract midpoints for batch fetching
     midpoints = []
@@ -131,7 +140,7 @@ def score_city_segments(place_query: str, max_segments: int = 500) -> gpd.GeoDat
 
     # Convert canopy height to estimated cover percentage
     edges["canopy_pct"] = [
-        height_to_cover_pct(r["value"]) if r["value"] is not None else 20.0
+        height_to_cover_pct(r["value"]) if r["value"] is not None else 20.0  # default canopy cover % when data unavailable
         for r in canopy_results
     ]
 
@@ -226,19 +235,21 @@ def score_city_segments(place_query: str, max_segments: int = 500) -> gpd.GeoDat
     # Step 5: Compute comfort scores (disabled factors pass None → auto-excluded)
     scores = []
     for _, row in edges.iterrows():
-        noise = row["noise_dba"] if pd.notna(row["noise_dba"]) else (
+        noise = row.get("noise_dba") if pd.notna(row.get("noise_dba")) else (
             settings.noise_default_dba if settings.enable_noise_factor else None
         )
-        canopy = row["canopy_pct"] if settings.enable_canopy_factor else None
-        heat = row["heat_index"] if pd.notna(row["heat_index"]) else (
+        canopy = row.get("canopy_pct") if pd.notna(row.get("canopy_pct")) else (
+            20.0 if settings.enable_canopy_factor else None
+        )
+        heat = row.get("heat_index") if pd.notna(row.get("heat_index")) else (
             settings.default_heat_index if settings.enable_heat_factor else None
         )
-        safety = row["safety_score"] if settings.enable_safety_factor else None
-        traffic = row["traffic_volume"] if pd.notna(row.get("traffic_volume")) else (
-            None  # engine handles None → excluded
+        safety = row.get("safety_score") if settings.enable_safety_factor else None
+        traffic = row.get("traffic_volume") if pd.notna(row.get("traffic_volume")) else (
+            settings.traffic_default_aadt if settings.enable_traffic_factor else None
         )
-        aqi_val = row["aqi"] if pd.notna(row.get("aqi")) else (
-            None  # engine handles None → excluded
+        aqi_val = row.get("aqi") if pd.notna(row.get("aqi")) else (
+            settings.aqi_default if settings.enable_aqi_factor else None
         )
 
         score = compute_comfort_score(
@@ -275,6 +286,8 @@ def generate_comfort_geojson(place_query: str, max_segments: int = 200) -> dict:
     # Check result cache
     cached = get_result_cache(place_query, max_segments)
     if cached is not None:
+        import copy
+        cached = copy.deepcopy(cached)
         cached.setdefault("metadata", {})["from_cache"] = True
         return cached
 
@@ -315,7 +328,7 @@ def generate_comfort_geojson(place_query: str, max_segments: int = 200) -> dict:
         },
     }
 
-    # Cache for 1 hour
+    # Cache for 30 days (all data is static/historical)
     set_result_cache(place_query, max_segments, result)
 
     return result

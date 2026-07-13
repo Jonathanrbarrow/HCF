@@ -175,7 +175,7 @@ class TestEndToEndPipeline:
 
         geojson = generate_comfort_geojson(random_city["osmnx_query"])
 
-        valid_statuses = {"real", "default", "unavailable", "fixed"}
+        valid_statuses = {"real", "default", "unavailable", "fixed", "disabled"}
 
         for i, feature in enumerate(geojson["features"][:20]):
             props = feature.get("properties", {})
@@ -183,7 +183,7 @@ class TestEndToEndPipeline:
             assert dq is not None, f"Feature {i} missing data_quality"
             assert isinstance(dq, dict), f"Feature {i} data_quality is not a dict"
 
-            for key in ("noise", "canopy", "heat"):
+            for key in ("noise", "canopy", "heat", "safety", "traffic", "aqi"):
                 assert key in dq, f"Feature {i} data_quality missing '{key}'"
                 assert dq[key] in valid_statuses, (
                     f"Feature {i} data_quality['{key}'] = '{dq[key]}' "

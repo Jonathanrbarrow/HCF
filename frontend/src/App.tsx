@@ -9,20 +9,10 @@ import InterventionCard from './components/InterventionCard';
 import EmptyState from './components/EmptyState';
 import { useComfortData } from './hooks/useComfortData';
 import { computeComfortScoreClient } from './utils/scoring';
-import type { ComfortFeature } from './types/comfort';
+import { getSegmentId } from './utils/segments';
 
-// Helper to generate a unique client-side ID for a street segment based on properties + coordinates
-const getSegmentId = (f: ComfortFeature): string => {
-  const geom = f.geometry;
-  if (geom.type === 'MultiLineString') {
-    const firstCoord = geom.coordinates[0][0];
-    return `${f.properties.street_name}#${firstCoord[0].toFixed(5)},${firstCoord[1].toFixed(5)}`;
-  } else if (geom.type === 'LineString') {
-    const firstCoord = geom.coordinates[0];
-    return `${f.properties.street_name}#${firstCoord[0].toFixed(5)},${firstCoord[1].toFixed(5)}`;
-  }
-  return `${f.properties.street_name}#unknown`;
-};
+// Re-export for any other consumers
+export { getSegmentId } from './utils/segments';
 
 const App: React.FC = () => {
   const { data, loading, error, analyze } = useComfortData();
@@ -112,7 +102,7 @@ const App: React.FC = () => {
   // Safe handler to update overrides
   const handleUpdateIntervention = (
     id: string,
-    updates: { canopy_pct?: number; noise_dba?: number; safety_score?: number } | null
+    updates: { canopy_pct?: number; noise_dba?: number; safety_score?: number; heat_index?: number; traffic_volume?: number } | null
   ) => {
     setInterventions((prev) => {
       const next = { ...prev };
@@ -246,13 +236,13 @@ const App: React.FC = () => {
           <h1>
             <span>HCF</span> Human Comfort Factors
           </h1>
-          <SearchBar onSearch={handleSearch} loading={loading} />
+          <SearchBar onSearch={handleSearch} loading={loading} initialValue={initialParams.city ?? ''} />
         </div>
 
         {/* Dynamic Weight Sliders Panel */}
         <div className="weight-panel">
           <div className="slider-group">
-            <label>🔊 Noise Weight: {wNoise}%</label>
+            <label>🔊 Noise: {wNoise}</label>
             <input
               type="range"
               min="0"
@@ -263,7 +253,7 @@ const App: React.FC = () => {
             />
           </div>
           <div className="slider-group">
-            <label>🌳 Shade Weight: {wCanopy}%</label>
+            <label>🌳 Shade: {wCanopy}</label>
             <input
               type="range"
               min="0"
@@ -274,7 +264,7 @@ const App: React.FC = () => {
             />
           </div>
           <div className="slider-group">
-            <label>🌡️ Heat Weight: {wHeat}%</label>
+            <label>🌡️ Heat: {wHeat}</label>
             <input
               type="range"
               min="0"
@@ -285,7 +275,7 @@ const App: React.FC = () => {
             />
           </div>
           <div className="slider-group">
-            <label>🛡️ Safety Weight: {wSafety}%</label>
+            <label>🛡️ Safety: {wSafety}</label>
             <input
               type="range"
               min="0"
@@ -297,7 +287,7 @@ const App: React.FC = () => {
           </div>
           {hasTraffic && (
             <div className="slider-group">
-              <label>🚗 Traffic Weight: {wTraffic}%</label>
+              <label>🚗 Traffic: {wTraffic}</label>
               <input
                 type="range"
                 min="0"
@@ -339,10 +329,8 @@ const App: React.FC = () => {
           wHeat={wHeat}
           wSafety={wSafety}
           wTraffic={wTraffic}
-          onSelectSegment={(lat, lon, properties) => {
-            const f = { geometry: { type: 'LineString' as const, coordinates: [[lon, lat]] }, properties } as ComfortFeature;
-            const id = getSegmentId(f);
-            setSelectedSegment({ lat, lon, properties, id });
+          onSelectSegment={(lat, lon, properties, segmentId) => {
+            setSelectedSegment({ lat, lon, properties, id: segmentId });
           }}
         />
         <InterventionCard
@@ -350,6 +338,11 @@ const App: React.FC = () => {
           intervention={selectedSegment ? interventions[selectedSegment.id] : undefined}
           onUpdateIntervention={handleUpdateIntervention}
           onClose={() => setSelectedSegment(null)}
+          wNoise={wNoise}
+          wCanopy={wCanopy}
+          wHeat={wHeat}
+          wSafety={wSafety}
+          wTraffic={wTraffic}
         />
         {!data && !loading && !error && (
           <EmptyState onSelectCity={handleSearch} />

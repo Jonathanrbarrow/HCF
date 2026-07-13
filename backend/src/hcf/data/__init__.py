@@ -4,6 +4,7 @@ from hcf.data.noise import fetch_noise_at_point, fetch_noise_batch, check_noise_
 from hcf.data.canopy import fetch_canopy_at_point, fetch_canopy_batch, height_to_cover_pct
 from hcf.data.heat import fetch_heat_at_point, fetch_heat_batch
 from hcf.data.traffic import fetch_traffic_at_point, fetch_traffic_batch, check_traffic_api
+from hcf.data.aqi import fetch_aqi_at_point, fetch_aqi_batch, check_aqi_api
 
 __all__ = [
     "fetch_walk_network",
@@ -19,4 +20,7 @@ __all__ = [
     "fetch_traffic_at_point",
     "fetch_traffic_batch",
     "check_traffic_api",
+    "fetch_aqi_at_point",
+    "fetch_aqi_batch",
+    "check_aqi_api",
 ]

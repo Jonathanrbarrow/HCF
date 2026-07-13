@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     cache_dir: str = ".cache"
     cache_ttl_network: int = 86400    # 24h
     cache_ttl_result: int = 2592000   # 30 days — all data is static/historical
+    cache_hmac_key: str = ""  # Set HCF_CACHE_HMAC_KEY for pickle signing; empty = auto-generated per-process key
 
     # Noise API
     noise_api_url: str = "https://geo.dot.gov/server/rest/services/Hosted/NTAD_Noise_2020_CONUS_Road/MapServer"

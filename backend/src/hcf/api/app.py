@@ -3,7 +3,9 @@ HCF API application factory.
 
 Run with: uvicorn hcf.api.app:create_app --factory --reload
 """
+import logging
 import os
+import pathlib
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -13,6 +15,8 @@ from fastapi.responses import FileResponse
 from hcf import __version__
 from hcf.config import settings
 from hcf.api.routes import router
+
+logger = logging.getLogger(__name__)
 
 
 def create_app() -> FastAPI:
@@ -33,12 +37,17 @@ def create_app() -> FastAPI:
 
     app.include_router(router)
 
+    # Warn if production is using default localhost CORS origins
+    if settings.env == "production" and any("localhost" in o for o in settings.cors_origins):
+        logger.warning(
+            "Running in production with localhost in CORS origins. "
+            "Set HCF_CORS_ORIGINS to your frontend domain(s)."
+        )
+
     # Serve the frontend if the frontend directory exists
-    frontend_dir = os.path.join(
-        os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))),
-        "frontend",
-    )
-    if os.path.isdir(frontend_dir):
+    frontend_dir = pathlib.Path(__file__).resolve().parents[3] / "frontend"
+    if frontend_dir.is_dir():
+        frontend_dir = str(frontend_dir)  # StaticFiles expects str
         app.mount("/static", StaticFiles(directory=frontend_dir), name="frontend")
 
         @app.get("/")

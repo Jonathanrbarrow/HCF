@@ -124,10 +124,10 @@ def _aqi_penalty(aqi: float) -> float:
 
 
 def compute_comfort_score(
-    noise_dba: float | None = 0.0,
-    canopy_pct: float | None = 100.0,
-    heat_index: float | None = 70.0,
-    safety_score: float | None = 100.0,
+    noise_dba: float | None = None,
+    canopy_pct: float | None = None,
+    heat_index: float | None = None,
+    safety_score: float | None = None,
     traffic_volume: float | None = None,
     aqi: float | None = None,
     weights: dict | None = None,

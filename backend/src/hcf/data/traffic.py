@@ -235,4 +235,9 @@ def fetch_traffic_batch(
             idx, result = future.result()
             results[idx] = result
 
+    # Safety net: replace any remaining None entries (thread execution failed)
+    for i, r in enumerate(results):
+        if r is None:
+            results[i] = {"value": None, "quality": "unavailable"}
+
     return results  # type: ignore[return-value]

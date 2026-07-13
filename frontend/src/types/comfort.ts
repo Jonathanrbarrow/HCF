@@ -21,9 +21,13 @@ export interface ComfortProperties {
   data_quality?: DataQuality;
 }
 
+export type ComfortGeometry =
+  | GeoJSON.LineString
+  | GeoJSON.MultiLineString;
+
 export interface ComfortFeature {
   type: 'Feature';
-  geometry: GeoJSON.Geometry;
+  geometry: ComfortGeometry;
   properties: ComfortProperties;
 }
 

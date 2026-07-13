@@ -177,6 +177,11 @@ def fetch_canopy_batch(points: list[tuple[float, float]]) -> list[dict]:
             except Exception:
                 results[idx] = {"value": None, "quality": "unavailable"}
 
+    # Safety net: replace any remaining None entries (batch + fallback both failed)
+    for i, r in enumerate(results):
+        if r is None:
+            results[i] = {"value": None, "quality": "unavailable"}
+
     return results  # type: ignore[return-value]
 
 

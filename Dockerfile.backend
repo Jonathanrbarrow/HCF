@@ -16,13 +16,15 @@ WORKDIR /app
 
 # Install Python deps first (cache layer)
 COPY backend/pyproject.toml ./
-RUN pip install --no-cache-dir -e ".[dev]" 2>/dev/null || \
-    pip install --no-cache-dir \
+RUN pip install --no-cache-dir \
     fastapi uvicorn[standard] osmnx geopandas shapely \
     requests rasterio boto3 pydantic pydantic-settings pytest httpx
 
 # Copy backend source
 COPY backend/ ./
+
+# Install package in editable mode (source now available)
+RUN pip install --no-cache-dir -e .
 
 # Create cache directory
 RUN mkdir -p /tmp/hcf-cache

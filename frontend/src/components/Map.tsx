@@ -3,7 +3,7 @@ import { renderToString } from 'react-dom/server';
 import { MapContainer, TileLayer, GeoJSON, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import type { Map as LeafletMap, Layer, PathOptions } from 'leaflet';
-import type { ComfortGeoJSON, ComfortFeature } from '../types/comfort';
+import type { ComfortGeoJSON, ComfortFeature, ComfortProperties } from '../types/comfort';
 import { scoreToColor } from '../utils/colors';
 import { computeComfortScoreClient } from '../utils/scoring';
 import {
@@ -25,7 +25,7 @@ interface ComfortMapProps {
   wHeat: number;
   wSafety: number;
   wTraffic: number;
-  selectedSegment: { lat: number; lon: number; properties: any } | null;
+  selectedSegment: { lat: number; lon: number; properties: ComfortProperties } | null;
 }
 
 // Controller component to handle programmatically flying and opening popups
@@ -62,9 +62,15 @@ const ComfortMap: React.FC<ComfortMapProps> = ({
   const mapRef = useRef<LeafletMap | null>(null);
   const [geoJsonKey, setGeoJsonKey] = useState(0);
 
-  // Bump key whenever data or weights change to force GeoJSON layer re-render
+  // Bump key whenever data or weights change to force GeoJSON layer re-render.
+  // Debounce weight changes to avoid destroying/recreating the layer on every
+  // slider tick (which causes severe performance issues during dragging).
   useEffect(() => {
-    setGeoJsonKey((k) => k + 1);
+    if (!data) return;
+    const timer = setTimeout(() => {
+      setGeoJsonKey((k) => k + 1);
+    }, 150);
+    return () => clearTimeout(timer);
   }, [data, wNoise, wCanopy, wHeat, wSafety, wTraffic]);
 
   // Fit bounds when data arrives

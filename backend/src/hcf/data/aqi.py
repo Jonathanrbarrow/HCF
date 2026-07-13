@@ -56,7 +56,7 @@ def fetch_aqi_at_point(lat: float, lon: float) -> dict | None:
         if pm25_obs:
             return {
                 "aqi": int(pm25_obs[0]["AQI"]),
-                "pm25": float(pm25_obs[0]["AQI"]),
+                "pm25": float(pm25_obs[0].get("Concentration", pm25_obs[0]["AQI"])),
                 "category": pm25_obs[0].get("Category", {}).get("Name", ""),
             }
 

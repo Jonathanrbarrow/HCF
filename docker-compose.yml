@@ -10,7 +10,7 @@ services:
     environment:
       - HCF_ENV=development
       - HCF_CACHE_DIR=/tmp/hcf-cache
-      - HCF_CORS_ORIGINS=["http://localhost:5173"]
+      - 'HCF_CORS_ORIGINS=["http://localhost:5173"]'
     command: uvicorn hcf.api.app:app --host 0.0.0.0 --port 8000 --reload
     restart: unless-stopped
 

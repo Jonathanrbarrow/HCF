@@ -26,7 +26,9 @@ const downloadBlob = (content: string, filename: string, type: string) => {
   const a = document.createElement('a');
   a.href = url;
   a.download = filename;
+  document.body.appendChild(a);
   a.click();
+  document.body.removeChild(a);
   URL.revokeObjectURL(url);
 };
 
@@ -53,7 +55,7 @@ const StatsBar: React.FC<StatsBarProps> = ({ stats, data }) => {
     const rows = data.features.map((f) => {
       const p = f.properties;
       const dq = p.data_quality
-        ? `noise=${p.data_quality.noise} canopy=${p.data_quality.canopy} heat=${p.data_quality.heat} safety=${p.data_quality.safety} traffic=${p.data_quality.traffic}`
+        ? `noise=${p.data_quality.noise} canopy=${p.data_quality.canopy} heat=${p.data_quality.heat} safety=${p.data_quality.safety} traffic=${p.data_quality.traffic} aqi=${p.data_quality.aqi}`
         : '';
       return [
         `"${(p.street_name ?? '').replace(/"/g, '""')}"`,
@@ -77,7 +79,7 @@ const StatsBar: React.FC<StatsBarProps> = ({ stats, data }) => {
       </span>
       <span className="stat-item">
         Avg Score: <strong>{stats.avg.toFixed(1)}</strong>
-        {stats.baselineAvg !== stats.avg && (
+        {Math.abs(stats.baselineAvg - stats.avg) > 0.05 && (
           <span style={{ fontSize: 10, color: stats.avg > stats.baselineAvg ? '#22c55e' : '#f97316', marginLeft: 4 }}>
             ({stats.avg > stats.baselineAvg ? '+' : ''}{(stats.avg - stats.baselineAvg).toFixed(1)} from baseline)
           </span>
@@ -91,11 +93,11 @@ const StatsBar: React.FC<StatsBarProps> = ({ stats, data }) => {
       </span>
       {data && data.features.length > 0 && data.features[0].properties.data_quality && (
         <span className="stat-item" style={{ fontSize: 10, color: 'var(--text-secondary)' }} title="% of segments with real data per factor">
-          Data: {(['noise', 'canopy', 'heat', 'safety', 'traffic'] as const).map((key) => {
+          Data: {(['noise', 'canopy', 'heat', 'safety', 'traffic', 'aqi'] as const).map((key) => {
             const total = data.features.length;
             const real = data.features.filter((f) => f.properties.data_quality?.[key] === 'real').length;
             const pct = Math.round((real / total) * 100);
-            const emoji = key === 'noise' ? '🔊' : key === 'canopy' ? '🌳' : key === 'heat' ? '🌡️' : key === 'safety' ? '🛡️' : '🚗';
+            const emoji = key === 'noise' ? '🔊' : key === 'canopy' ? '🌳' : key === 'heat' ? '🌡️' : key === 'safety' ? '🛡️' : key === 'traffic' ? '🚗' : '🌬️';
             return <span key={key} style={{ marginRight: 6, color: pct > 70 ? '#22c55e' : pct > 30 ? '#f97316' : '#ef4444' }}>{emoji}{pct}%</span>;
           })}
         </span>
