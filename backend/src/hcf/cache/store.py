@@ -127,8 +127,11 @@ def cleanup_cache(max_age_seconds: int | None = None) -> None:
         return
     now = time.time()
     for path in _get_cache_dir().iterdir():
-        if path.is_file() and path.suffix in (".json", ".pkl") and (now - path.stat().st_mtime) > max_age_seconds:
-            path.unlink(missing_ok=True)
+        try:
+            if path.is_file() and path.suffix in (".json", ".pkl") and (now - path.stat().st_mtime) > max_age_seconds:
+                path.unlink(missing_ok=True)
+        except (FileNotFoundError, OSError):
+            pass  # file deleted by another process between iterdir() and stat()
 
 
 # --- Network cache (pickle, 24h) ---
