@@ -172,10 +172,11 @@ class TestEndToEndPipeline:
         - Each value is one of: "real", "default", "unavailable", "fixed"
         """
         from hcf.scoring.pipeline import generate_comfort_geojson
+        from hcf.data.quality import VALID_STATUSES
 
         geojson = generate_comfort_geojson(random_city["osmnx_query"])
 
-        valid_statuses = {"real", "default", "unavailable", "fixed", "disabled"}
+        valid_statuses = VALID_STATUSES
 
         for i, feature in enumerate(geojson["features"][:20]):
             props = feature.get("properties", {})

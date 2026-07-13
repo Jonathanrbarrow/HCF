@@ -1,8 +1,9 @@
 const computeNoisePenalty = (noise: number | null): number => {
-  if (noise === null) return 5.0 / 35.0; // corresponding to 50 dBA: (50-45)/35 = 0.1428
-  if (noise <= 45.0) return 0.0;
-  if (noise >= 80.0) return 1.0;
-  return (noise - 45.0) / (80.0 - 45.0);
+  // Backend default: settings.noise_default_dba = 50.0
+  const n = noise !== null ? noise : 50.0;
+  if (n <= 45.0) return 0.0;
+  if (n >= 80.0) return 1.0;
+  return (n - 45.0) / (80.0 - 45.0);
 };
 
 const computeCanopyPenalty = (canopyPct: number | null): number => {
@@ -23,6 +24,8 @@ const computeSafetyPenalty = (safetyScore: number | null): number => {
 };
 
 const computeTrafficPenalty = (aadt: number | null): number => {
+  // Null handled by caller (excluded when traffic factor disabled);
+  // server defaults missing data to settings.traffic_default_aadt = 5000
   if (aadt === null) return 0.0;
   if (aadt <= 1000) return 0.0;
   if (aadt >= 30000) return 1.0;
@@ -30,6 +33,8 @@ const computeTrafficPenalty = (aadt: number | null): number => {
 };
 
 const computeAqiPenalty = (aqi: number | null): number => {
+  // Null handled by caller (excluded when AQI factor disabled);
+  // server defaults missing data to settings.aqi_default = 50
   if (aqi === null) return 0.0;
   if (aqi <= 50) return 0.0;
   if (aqi >= 200) return 1.0;

@@ -16,6 +16,7 @@ from datetime import date
 import requests
 
 from hcf.config import settings
+from hcf.data.quality import REAL, DEFAULT
 
 logger = logging.getLogger(__name__)
 
@@ -144,8 +145,8 @@ def fetch_heat_batch(points: list[tuple[float, float]]) -> list[dict]:
         key = _rounded(lat, lon)
         value = cache.get(key)
         if value is not None:
-            results.append({"value": round(value, 1), "quality": "real"})
+            results.append({"value": round(value, 1), "quality": REAL})
         else:
-            results.append({"value": settings.default_heat_index, "quality": "default"})
+            results.append({"value": settings.default_heat_index, "quality": DEFAULT})
 
     return results

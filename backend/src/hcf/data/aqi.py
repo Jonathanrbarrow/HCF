@@ -14,6 +14,7 @@ import logging
 import requests
 
 from hcf.config import settings
+from hcf.data.quality import REAL, DEFAULT, UNAVAILABLE, DISABLED
 
 logger = logging.getLogger(__name__)
 
@@ -90,13 +91,13 @@ def fetch_aqi_batch(
           - "category": str (AQI category name) or None
     """
     if not settings.enable_aqi_factor:
-        return [{"value": None, "quality": "disabled", "category": None}
+        return [{"value": None, "quality": DISABLED, "category": None}
                 for _ in points]
 
     if not settings.airnow_api_key:
         logger.warning("AQI factor enabled but no AirNow API key set "
                        "(HCF_AIRNOW_API_KEY). Returning defaults.")
-        return [{"value": None, "quality": "unavailable", "category": None}
+        return [{"value": None, "quality": UNAVAILABLE, "category": None}
                 for _ in points]
 
     # Deduplicate: round to 2 decimal places (~1km grid).
@@ -126,8 +127,11 @@ def fetch_aqi_batch(
             for k, v in unique_cells.items()
         }
         for future in as_completed(futures):
-            cell_key, result = future.result()
-            cache[cell_key] = result
+            try:
+                cell_key, result = future.result()
+                cache[cell_key] = result
+            except Exception:
+                pass  # cell stays absent → will get default AQI
 
     # Map results back to all points
     results = []
@@ -137,13 +141,13 @@ def fetch_aqi_batch(
         if data is not None:
             results.append({
                 "value": data["aqi"],
-                "quality": "real",
+                "quality": REAL,
                 "category": data.get("category"),
             })
         else:
             results.append({
                 "value": settings.aqi_default,
-                "quality": "default",
+                "quality": DEFAULT,
                 "category": None,
             })
 

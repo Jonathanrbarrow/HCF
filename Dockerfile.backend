@@ -1,6 +1,6 @@
-FROM python:3.12-slim
+# Stage 1: Builder
+FROM python:3.12-slim AS builder
 
-# Install GDAL and spatial libraries (required by rasterio, osmnx)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     gdal-bin \
@@ -9,24 +9,37 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libproj-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Set GDAL environment
 ENV GDAL_CONFIG=/usr/bin/gdal-config
 
 WORKDIR /app
 
-# Install Python deps first (cache layer)
 COPY backend/pyproject.toml ./
 RUN pip install --no-cache-dir \
     fastapi uvicorn[standard] osmnx geopandas shapely \
     requests rasterio boto3 pydantic pydantic-settings pytest httpx
 
-# Copy backend source
 COPY backend/ ./
-
-# Install package in editable mode (source now available)
 RUN pip install --no-cache-dir -e .
 
-# Create cache directory
+# Stage 2: Runtime
+FROM python:3.12-slim
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gdal-bin \
+    libgdal-dev \
+    libgeos-dev \
+    libproj-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+ENV GDAL_CONFIG=/usr/bin/gdal-config
+
+WORKDIR /app
+
+# Copy installed packages and source from builder
+COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
+COPY --from=builder /usr/local/bin /usr/local/bin
+COPY --from=builder /app /app
+
 RUN mkdir -p /tmp/hcf-cache
 
 ENV HCF_CACHE_DIR=/tmp/hcf-cache

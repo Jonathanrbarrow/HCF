@@ -21,6 +21,7 @@ import geopandas as gpd
 from shapely.geometry import mapping
 
 from hcf.config import settings
+from hcf.data.quality import REAL, DEFAULT, DISABLED
 from hcf.data.network import fetch_walk_network, network_to_geodataframe
 from hcf.data.noise import fetch_noise_batch
 from hcf.data.canopy import fetch_canopy_batch, height_to_cover_pct
@@ -64,6 +65,9 @@ def score_city_segments(place_query: str, max_segments: int = 200) -> gpd.GeoDat
     edges = network_to_geodataframe(graph)
 
     # Limit segments for API rate limiting
+    # Deterministic sampling ensures cache hits — same city + max_segments
+    # always returns the same set of segments.  Trade-off: some segments
+    # are never scored.  Change seed or increase max_segments to explore.
     if max_segments and len(edges) > max_segments:
         edges = edges.sample(n=max_segments, random_state=42)
 
@@ -85,17 +89,17 @@ def score_city_segments(place_query: str, max_segments: int = 200) -> gpd.GeoDat
     def _get_noise():
         if settings.enable_noise_factor:
             return fetch_noise_batch(midpoints)
-        return [{"value": None, "quality": "disabled"} for _ in midpoints]
+        return [{"value": None, "quality": DISABLED} for _ in midpoints]
 
     def _get_canopy():
         if settings.enable_canopy_factor:
             return fetch_canopy_batch(midpoints)
-        return [{"value": None, "quality": "disabled"} for _ in midpoints]
+        return [{"value": None, "quality": DISABLED} for _ in midpoints]
 
     def _get_heat():
         if settings.enable_heat_factor:
             return fetch_heat_batch(midpoints)
-        return [{"value": None, "quality": "disabled"} for _ in midpoints]
+        return [{"value": None, "quality": DISABLED} for _ in midpoints]
 
     def _get_traffic():
         return fetch_traffic_batch(midpoints)  # internally checks its own flag
@@ -226,7 +230,7 @@ def score_city_segments(place_query: str, max_segments: int = 200) -> gpd.GeoDat
             "noise": noise_results[i]["quality"],
             "canopy": canopy_results[i]["quality"],
             "heat": heat_results[i]["quality"],
-            "safety": "real" if has_real_safety else "default",
+            "safety": REAL if has_real_safety else DEFAULT,
             "traffic": traffic_results[i]["quality"],
             "aqi": aqi_results[i]["quality"],
         })

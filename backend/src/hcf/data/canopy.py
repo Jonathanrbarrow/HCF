@@ -26,6 +26,7 @@ import os
 import requests
 
 from hcf.config import settings
+from hcf.data.quality import REAL, DEFAULT, UNAVAILABLE
 
 logger = logging.getLogger(__name__)
 
@@ -171,16 +172,16 @@ def fetch_canopy_batch(points: list[tuple[float, float]]) -> list[dict]:
             try:
                 value = fetch_canopy_at_point(lat, lon)
                 if value is not None:
-                    results[idx] = {"value": value, "quality": "real"}
+                    results[idx] = {"value": value, "quality": REAL}
                 else:
-                    results[idx] = {"value": None, "quality": "default"}
+                    results[idx] = {"value": None, "quality": DEFAULT}
             except Exception:
-                results[idx] = {"value": None, "quality": "unavailable"}
+                results[idx] = {"value": None, "quality": UNAVAILABLE}
 
     # Safety net: replace any remaining None entries (batch + fallback both failed)
     for i, r in enumerate(results):
         if r is None:
-            results[i] = {"value": None, "quality": "unavailable"}
+            results[i] = {"value": None, "quality": UNAVAILABLE}
 
     return results  # type: ignore[return-value]
 
@@ -214,19 +215,19 @@ def _batch_read_tile(
                 try:
                     row, col = src.index(lon, lat)
                     if row < 0 or row >= src.height or col < 0 or col >= src.width:
-                        results[idx] = {"value": None, "quality": "default"}
+                        results[idx] = {"value": None, "quality": DEFAULT}
                         continue
                     window = Window(col, row, 1, 1)
                     data = src.read(1, window=window)
                     value = float(data[0, 0])
                     if src.nodata is not None and value == src.nodata:
-                        results[idx] = {"value": None, "quality": "default"}
+                        results[idx] = {"value": None, "quality": DEFAULT}
                     elif value < 0:
-                        results[idx] = {"value": None, "quality": "default"}
+                        results[idx] = {"value": None, "quality": DEFAULT}
                     else:
-                        results[idx] = {"value": value, "quality": "real"}
+                        results[idx] = {"value": value, "quality": REAL}
                 except Exception:
-                    results[idx] = {"value": None, "quality": "unavailable"}
+                    results[idx] = {"value": None, "quality": UNAVAILABLE}
 
 
 def _fetch_via_rasterio(lat: float, lon: float, quadkey: str) -> float | None:

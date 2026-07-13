@@ -19,6 +19,7 @@ import logging
 import requests
 
 from hcf.config import settings
+from hcf.data.quality import REAL, DEFAULT, UNAVAILABLE, DISABLED
 
 logger = logging.getLogger(__name__)
 
@@ -201,7 +202,7 @@ def fetch_traffic_batch(
           - "quality": "real" | "default" | "unavailable" | "disabled"
     """
     if not settings.enable_traffic_factor:
-        return [{"value": None, "quality": "disabled"} for _ in points]
+        return [{"value": None, "quality": DISABLED} for _ in points]
 
     # Resolve state from first point if not provided (single call)
     if state_abbr is None and points:
@@ -216,14 +217,14 @@ def fetch_traffic_batch(
         try:
             value = fetch_traffic_at_point(lat, lon, state_abbr=resolved_state)
             if value is not None:
-                return idx, {"value": value, "quality": "real"}
+                return idx, {"value": value, "quality": REAL}
             else:
                 return idx, {
                     "value": settings.traffic_default_aadt,
-                    "quality": "default",
+                    "quality": DEFAULT,
                 }
         except Exception:
-            return idx, {"value": None, "quality": "unavailable"}
+            return idx, {"value": None, "quality": UNAVAILABLE}
 
     results: list[dict | None] = [None] * len(points)
     with ThreadPoolExecutor(max_workers=10) as executor:
@@ -238,6 +239,6 @@ def fetch_traffic_batch(
     # Safety net: replace any remaining None entries (thread execution failed)
     for i, r in enumerate(results):
         if r is None:
-            results[i] = {"value": None, "quality": "unavailable"}
+            results[i] = {"value": None, "quality": UNAVAILABLE}
 
     return results  # type: ignore[return-value]

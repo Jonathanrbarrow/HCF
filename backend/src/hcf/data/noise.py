@@ -11,12 +11,14 @@ to sample pixel values at specific lat/lon points.
 No authentication required.
 """
 import logging
-import requests
 import math
 
-logger = logging.getLogger(__name__)
+import requests
 
 from hcf.config import settings
+from hcf.data.quality import REAL, DEFAULT, UNAVAILABLE
+
+logger = logging.getLogger(__name__)
 
 # DOT noise map raster service — CONUS road noise (2020)
 NOISE_MAP_URL = settings.noise_api_url
@@ -135,11 +137,11 @@ def fetch_noise_batch(points: list[tuple[float, float]]) -> list[dict]:
         try:
             value = fetch_noise_at_point(lat, lon)
             if value is not None:
-                return idx, {"value": value, "quality": "real"}
+                return idx, {"value": value, "quality": REAL}
             else:
-                return idx, {"value": settings.noise_default_dba, "quality": "default"}
+                return idx, {"value": settings.noise_default_dba, "quality": DEFAULT}
         except Exception:
-            return idx, {"value": None, "quality": "unavailable"}
+            return idx, {"value": None, "quality": UNAVAILABLE}
 
     results: list[dict | None] = [None] * len(points)
     with ThreadPoolExecutor(max_workers=10) as executor:
@@ -154,7 +156,7 @@ def fetch_noise_batch(points: list[tuple[float, float]]) -> list[dict]:
     # Safety net: replace any remaining None entries (thread execution failed)
     for i, r in enumerate(results):
         if r is None:
-            results[i] = {"value": None, "quality": "unavailable"}
+            results[i] = {"value": None, "quality": UNAVAILABLE}
 
     return results  # type: ignore[return-value]
 
