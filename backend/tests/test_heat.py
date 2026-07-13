@@ -81,6 +81,7 @@ class TestHeatDataFetch:
         for r in results:
             assert "value" in r, "Missing 'value' key"
             assert "quality" in r, "Missing 'quality' key"
-            assert r["quality"] in {"real", "default", "unavailable"}
+            from hcf.data.quality import VALID_STATUSES
+            assert r["quality"] in VALID_STATUSES
             if r["value"] is not None:
                 assert -30 <= r["value"] <= 130, f"Value {r['value']} out of range"
