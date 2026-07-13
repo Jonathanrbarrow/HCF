@@ -47,9 +47,11 @@ const StatsBar: React.FC<StatsBarProps> = ({ stats, data }) => {
       'comfort_score',
       'noise_dba',
       'canopy_pct',
+      'canopy_height_m',
       'heat_index',
       'safety_score',
       'traffic_volume',
+      'aqi',
       'data_quality',
     ];
     const rows = data.features.map((f) => {
@@ -62,9 +64,11 @@ const StatsBar: React.FC<StatsBarProps> = ({ stats, data }) => {
         p.comfort_score,
         p.noise_dba,
         p.canopy_pct,
+        p.canopy_height_m,
         p.heat_index,
         p.safety_score,
         p.traffic_volume,
+        p.aqi,
         `"${dq}"`,
       ].join(',');
     });
